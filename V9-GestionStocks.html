@@ -1411,10 +1411,14 @@
         });
 
         // Gestion de l'inventaire
-        let inventory = JSON.parse(localStorage.getItem('inventory')) || [];
-        normalizeInventory();
+        const API_BASE_URL = (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) || '/api';
+        let inventory = [];
         let editMode = false;
         let currentEditId = null;
+        let inventoryLoaded = false;
+        let syncInProgress = false;
+        let syncQueued = false;
+        let lastSyncErrorAt = null;
 
         // Éléments du DOM
         const itemForm = document.getElementById('itemForm');
@@ -1441,6 +1445,102 @@
         const mobileAddItemBtn = document.getElementById('mobileAddItem');
         const mobileScrollInventoryBtn = document.getElementById('mobileScrollInventory');
         const mobileScrollStatsBtn = document.getElementById('mobileScrollStats');
+
+        async function initializeInventory() {
+            const localInventoryRaw = localStorage.getItem('inventory');
+            let localInventory = [];
+
+            if (localInventoryRaw) {
+                try {
+                    const parsed = JSON.parse(localInventoryRaw);
+                    if (Array.isArray(parsed)) {
+                        localInventory = parsed;
+                    }
+                } catch (error) {
+                    console.warn('Inventaire local invalide, réinitialisation.', error);
+                }
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/inventory`, { cache: 'no-store' });
+                if (!response.ok) {
+                    throw new Error(`Réponse inattendue du serveur (${response.status})`);
+                }
+
+                const payload = await response.json();
+                if (!payload || !Array.isArray(payload.inventory)) {
+                    throw new Error('Format de données invalide reçu depuis l\'API.');
+                }
+
+                inventory = payload.inventory.map(item => normalizeItem(item));
+                localStorage.setItem('inventory', JSON.stringify(inventory));
+                inventoryLoaded = true;
+                lastSyncErrorAt = null;
+            } catch (error) {
+                console.error('Impossible de charger l\'inventaire depuis le serveur :', error);
+                if (localInventory.length > 0) {
+                    inventory = localInventory.map(item => normalizeItem(item));
+                    showNotification('Serveur indisponible, inventaire local chargé.', 'warning');
+                } else {
+                    inventory = [];
+                    showNotification('Serveur indisponible. Inventaire initial vide.', 'warning');
+                }
+                inventoryLoaded = true;
+                lastSyncErrorAt = Date.now();
+            }
+
+            normalizeInventory();
+        }
+
+        function queueInventorySync(options = {}) {
+            if (syncInProgress) {
+                syncQueued = true;
+                return;
+            }
+
+            syncInventoryWithServer(options);
+        }
+
+        async function syncInventoryWithServer({ silent = true } = {}) {
+            if (!inventoryLoaded) {
+                return;
+            }
+
+            syncInProgress = true;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/inventory`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ inventory }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Échec de la synchronisation (${response.status})`);
+                }
+
+                if (!silent) {
+                    showNotification('Inventaire synchronisé avec le serveur.', 'success');
+                }
+
+                lastSyncErrorAt = null;
+            } catch (error) {
+                console.error('Erreur lors de la synchronisation de l\'inventaire :', error);
+                const now = Date.now();
+                if (!lastSyncErrorAt || now - lastSyncErrorAt > 60000) {
+                    showNotification('Synchronisation impossible. Les données sont sauvegardées localement.', 'warning');
+                    lastSyncErrorAt = now;
+                }
+            } finally {
+                syncInProgress = false;
+                if (syncQueued) {
+                    syncQueued = false;
+                    queueInventorySync({ silent: true });
+                }
+            }
+        }
 
         // Éléments pour les statistiques
         const statEnStock = document.getElementById('statEnStock');
@@ -1788,10 +1888,12 @@
         }
 
         // Initialisation
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             // Définir la date d'aujourd'hui par défaut
             document.getElementById('dateAchat').valueAsDate = new Date();
-            
+
+            await initializeInventory();
+
             // Charger l'inventaire
             updateInventoryTable();
             updateStats();
@@ -2698,8 +2800,10 @@
         }
 
         // Sauvegarder l'inventaire
-        function saveInventory() {
+        function saveInventory(options = {}) {
+            const { silentSync = true } = options;
             localStorage.setItem('inventory', JSON.stringify(inventory));
+            queueInventorySync({ silent: silentSync });
         }
 
         // Formater une date
