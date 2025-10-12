@@ -7,6 +7,9 @@ declare(strict_types=1);
 
 // Bootstrap WordPress to leverage authentication helpers when available.
 $rootPath = dirname(__FILE__, 5);
+if (!defined('WP_USE_THEMES')) {
+    define('WP_USE_THEMES', false);
+}
 if (is_dir($rootPath) && file_exists($rootPath . '/wp-load.php')) {
     require_once $rootPath . '/wp-load.php';
 }
