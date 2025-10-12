@@ -28,7 +28,7 @@ function inventory_json_response(array $payload, int $statusCode = 200): void
 if (function_exists('is_user_logged_in') && !is_user_logged_in()) {
     inventory_json_response([
         'success' => false,
-        'message' => __('Authentification requise.', 'uncode'),
+        'message' => 'Authentification requise.',
     ], 401);
 }
 
@@ -55,7 +55,7 @@ switch ($action) {
     default:
         inventory_json_response([
             'success' => false,
-            'message' => __('Action non reconnue.', 'uncode'),
+            'message' => 'Action non reconnue.',
         ], 400);
 }
 
@@ -74,7 +74,7 @@ function handle_add_product(PDO $pdo): void
     if ($nom === '' || $reference === '') {
         inventory_json_response([
             'success' => false,
-            'message' => __('Merci de renseigner au minimum le nom et la référence.', 'uncode'),
+            'message' => 'Merci de renseigner au minimum le nom et la référence.',
         ], 422);
     }
 
@@ -86,7 +86,7 @@ function handle_add_product(PDO $pdo): void
         if ($file['error'] !== UPLOAD_ERR_OK) {
             inventory_json_response([
                 'success' => false,
-                'message' => __('Erreur lors du téléchargement de l\'image.', 'uncode'),
+                'message' => "Erreur lors du téléchargement de l'image.",
             ], 400);
         }
 
@@ -99,7 +99,7 @@ function handle_add_product(PDO $pdo): void
         if (!in_array($mime, $allowedMimes, true)) {
             inventory_json_response([
                 'success' => false,
-                'message' => __('Format d\'image non supporté.', 'uncode'),
+                'message' => "Format d'image non supporté.",
             ], 415);
         }
 
@@ -114,7 +114,7 @@ function handle_add_product(PDO $pdo): void
         if (!move_uploaded_file($file['tmp_name'], $uploadDir . $imageName)) {
             inventory_json_response([
                 'success' => false,
-                'message' => __('Impossible de sauvegarder l\'image.', 'uncode'),
+                'message' => "Impossible de sauvegarder l'image.",
             ], 500);
         }
     }
@@ -142,7 +142,7 @@ function handle_add_product(PDO $pdo): void
 
     inventory_json_response([
         'success' => true,
-        'message' => __('Produit ajouté avec succès.', 'uncode'),
+        'message' => 'Produit ajouté avec succès.',
     ]);
 }
 
@@ -177,7 +177,7 @@ function handle_delete_product(PDO $pdo): void
     if ($id <= 0) {
         inventory_json_response([
             'success' => false,
-            'message' => __('Identifiant invalide.', 'uncode'),
+            'message' => 'Identifiant invalide.',
         ], 422);
     }
 
@@ -186,7 +186,7 @@ function handle_delete_product(PDO $pdo): void
 
     inventory_json_response([
         'success' => true,
-        'message' => __('Produit supprimé.', 'uncode'),
+        'message' => 'Produit supprimé.',
     ]);
 }
 
@@ -230,7 +230,7 @@ function handle_update_product(PDO $pdo): void
     if ($id <= 0 || !isset($allowedFields[$field])) {
         inventory_json_response([
             'success' => false,
-            'message' => __('Paramètres invalides.', 'uncode'),
+            'message' => 'Paramètres invalides.',
         ], 422);
     }
 
@@ -251,6 +251,6 @@ function handle_update_product(PDO $pdo): void
 
     inventory_json_response([
         'success' => true,
-        'message' => __('Produit mis à jour.', 'uncode'),
+        'message' => 'Produit mis à jour.',
     ]);
 }
