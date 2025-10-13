@@ -87,20 +87,30 @@ jQuery(document).ready(function ($) {
             ? `<img src="${uploadsUrl}${product.image}" alt="${escapeHtml(product.nom || '')}" class="inventory-thumb">`
             : '<div class="inventory-thumb placeholder">✨</div>';
         const marge = (Number(product.prix_vente) - Number(product.prix_achat)).toFixed(2);
+        const followUpActive = Number(product.a_renseigner_plus_tard) === 1;
+        const rowClassAttr = followUpActive ? ' class="needs-follow-up"' : '';
+        const locationValue = (product.casier_emplacement || '').trim();
+        const locationPlaceholder = escapeHtml('Casier à préciser');
+        const locationContent = locationValue !== '' ? escapeHtml(locationValue) : '';
+        const locationClass = locationValue === '' ? ' is-empty' : '';
+        const followUpChip = followUpActive ? '<span class="follow-up-chip">' + escapeHtml('À compléter') + '</span>' : '';
+        const followUpButton = `<button type="button" class="follow-up-toggle ${followUpActive ? 'is-pending' : 'is-complete'}" data-active="${followUpActive ? '1' : '0'}" aria-pressed="${followUpActive ? 'true' : 'false'}" aria-label="${escapeHtml('Basculer le suivi À renseigner plus tard')}">${escapeHtml(followUpActive ? 'À compléter' : 'Complet')}</button>`;
 
         return `
-            <tr data-id="${product.id}">
+            <tr data-id="${product.id}"${rowClassAttr}>
                 <td class="cell-image">${imageCell}</td>
                 <td class="cell-title">
                     <div class="item-name">${escapeHtml(product.nom || '')}</div>
-                    <div class="item-reference">${escapeHtml(product.reference || '')}</div>
+                    <div class="item-reference"><span>${escapeHtml(product.reference || '')}</span>${followUpChip}</div>
                     <div class="item-categories">${buildCategoryBadges(product)}</div>
                     <div class="item-tags">${buildTagBadges(product)}</div>
                 </td>
+                <td class="cell-location inventory-editable${locationClass}" contenteditable="true" data-field="casier_emplacement" data-placeholder="${locationPlaceholder}" aria-label="${escapeHtml('Casier ou emplacement')}">${locationContent}</td>
                 <td class="cell-price inventory-editable" contenteditable="true" data-field="prix_achat">${Number(product.prix_achat || 0).toFixed(2)}</td>
                 <td class="cell-price inventory-editable" contenteditable="true" data-field="prix_vente">${Number(product.prix_vente || 0).toFixed(2)}</td>
                 <td class="cell-stock inventory-editable" contenteditable="true" data-field="stock">${parseInt(product.stock, 10)}</td>
                 <td class="cell-marge">${formatCurrency(marge)}</td>
+                <td class="cell-follow-up">${followUpButton}</td>
                 <td class="cell-actions">
                     <button class="btn-icon manage-terms" title="Catégories & tags" aria-label="Catégories et tags">🏷️</button>
                     <button class="btn-icon delete-product" title="Supprimer" aria-label="Supprimer">✖</button>
@@ -113,7 +123,7 @@ jQuery(document).ready(function ($) {
         state.products = [];
         $tableBody.html(`
             <tr class="empty-state">
-                <td colspan="7">
+                <td colspan="9">
                     <div class="empty-wrapper">
                         <span class="empty-icon">💎</span>
                         <p>Aucun bijou dans l'inventaire pour le moment.</p>
@@ -172,7 +182,7 @@ jQuery(document).ready(function ($) {
         if (visibleRows === 0 && state.products.length > 0) {
             $tableBody.append(`
                 <tr class="empty-search">
-                    <td colspan="7">
+                    <td colspan="9">
                         <div class="empty-wrapper">
                             <span class="empty-icon">🔍</span>
                             <p>${escapeHtml('Aucun résultat ne correspond à votre recherche.')}</p>
@@ -390,6 +400,7 @@ jQuery(document).ready(function ($) {
         formData.append('nonce', nonce);
         formData.append('categories', JSON.stringify($productCategories.val() || []));
         formData.append('tags', JSON.stringify($productTags.val() || []));
+        formData.set('a_renseigner_plus_tard', $('#product-follow-up').is(':checked') ? '1' : '0');
 
         $.ajax({
             url: ajaxUrl,
@@ -402,6 +413,7 @@ jQuery(document).ready(function ($) {
             if (response.success) {
                 this.reset();
                 $('#image-preview').attr('src', '').addClass('is-empty');
+                $('#product-follow-up').prop('checked', false);
                 showToast(responseMessage(response, 'Produit ajouté.'));
                 loadProducts();
                 loadStats();
@@ -469,23 +481,32 @@ jQuery(document).ready(function ($) {
         const $row = $cell.closest('tr');
         const id = $row.data('id');
         const field = $cell.data('field');
-        let value = $cell.text().trim().replace(',', '.');
+        let value = $cell.text().trim();
         const original = $cell.data('original');
 
         if (field === 'stock') {
-            value = parseInt(value, 10);
-            if (Number.isNaN(value) || value < 0) {
+            let numericValue = parseInt(value, 10);
+            if (Number.isNaN(numericValue) || numericValue < 0) {
                 $cell.text(original);
                 return;
             }
+            value = numericValue;
+        } else if (field === 'prix_achat' || field === 'prix_vente') {
+            let floatValue = parseFloat(value.replace(',', '.'));
+            if (Number.isNaN(floatValue) || floatValue < 0) {
+                $cell.text(original);
+                return;
+            }
+            floatValue = floatValue.toFixed(2);
+            $cell.text(floatValue);
+            value = floatValue;
+        } else if (field === 'casier_emplacement') {
+            const sanitized = value.replace(/\s+/g, ' ').trim();
+            const truncated = sanitized.length > 120 ? sanitized.slice(0, 120) : sanitized;
+            value = truncated;
+            $cell.text(truncated);
         } else {
-            value = parseFloat(value);
-            if (Number.isNaN(value) || value < 0) {
-                $cell.text(original);
-                return;
-            }
-            value = value.toFixed(2);
-            $cell.text(value);
+            return;
         }
 
         $.ajax({
@@ -500,14 +521,102 @@ jQuery(document).ready(function ($) {
                 const prixVente = parseFloat($row.find('[data-field="prix_vente"]').text().replace(',', '.')) || 0;
                 const marge = prixVente - prixAchat;
                 $row.find('.cell-marge').text(formatCurrency(marge));
+                const productData = $row.data('product') || {};
+                if (field === 'casier_emplacement') {
+                    $cell.toggleClass('is-empty', value === '');
+                    productData.casier_emplacement = value;
+                    const stateProduct = state.products.find((item) => String(item.id) === String(id));
+                    if (stateProduct) {
+                        stateProduct.casier_emplacement = value;
+                    }
+                } else if (field === 'prix_achat') {
+                    const numeric = parseFloat(value);
+                    productData.prix_achat = numeric;
+                    const stateProduct = state.products.find((item) => String(item.id) === String(id));
+                    if (stateProduct) {
+                        stateProduct.prix_achat = numeric;
+                    }
+                } else if (field === 'prix_vente') {
+                    const numeric = parseFloat(value);
+                    productData.prix_vente = numeric;
+                    const stateProduct = state.products.find((item) => String(item.id) === String(id));
+                    if (stateProduct) {
+                        stateProduct.prix_vente = numeric;
+                    }
+                } else if (field === 'stock') {
+                    const numeric = parseInt(value, 10);
+                    productData.stock = numeric;
+                    const stateProduct = state.products.find((item) => String(item.id) === String(id));
+                    if (stateProduct) {
+                        stateProduct.stock = numeric;
+                    }
+                }
+                $row.data('product', productData);
                 loadStats();
+                updateSearchFilter();
             } else {
                 $cell.text(original);
+                if (field === 'casier_emplacement') {
+                    $cell.toggleClass('is-empty', original === '');
+                }
                 showToast(responseMessage(response, 'Mise à jour impossible.'), 'error');
             }
         }).fail(() => {
             $cell.text(original);
+            if (field === 'casier_emplacement') {
+                $cell.toggleClass('is-empty', original === '');
+            }
             showToast('Mise à jour impossible.', 'error');
+        });
+    });
+
+    $(document).on('click', '.follow-up-toggle', function () {
+        const $button = $(this);
+        const $row = $button.closest('tr');
+        const id = $row.data('id');
+
+        if (!id) {
+            return;
+        }
+
+        const isActive = String($button.data('active')) === '1';
+        const nextValue = isActive ? '0' : '1';
+
+        $.ajax({
+            url: ajaxUrl,
+            method: 'POST',
+            data: { action: 'inventory_update_product', id, field: 'a_renseigner_plus_tard', value: nextValue, nonce },
+            dataType: 'json',
+        }).done((response) => {
+            if (response.success) {
+                const nowActive = nextValue === '1';
+                $button.data('active', nowActive ? 1 : 0);
+                $button.toggleClass('is-pending', nowActive);
+                $button.toggleClass('is-complete', !nowActive);
+                $button.text(nowActive ? 'À compléter' : 'Complet');
+                $button.attr('aria-pressed', nowActive ? 'true' : 'false');
+                $row.toggleClass('needs-follow-up', nowActive);
+                const productData = $row.data('product') || {};
+                productData.a_renseigner_plus_tard = nowActive ? 1 : 0;
+                $row.data('product', productData);
+                const stateProduct = state.products.find((item) => String(item.id) === String(id));
+                if (stateProduct) {
+                    stateProduct.a_renseigner_plus_tard = nowActive ? 1 : 0;
+                }
+                if (nowActive) {
+                    if (!$row.find('.follow-up-chip').length) {
+                        $row.find('.item-reference').append('<span class="follow-up-chip">À compléter</span>');
+                    }
+                } else {
+                    $row.find('.follow-up-chip').remove();
+                }
+                showToast(responseMessage(response, nowActive ? 'Marqué à compléter.' : 'Marque retirée.'));
+                updateSearchFilter();
+            } else {
+                showToast(responseMessage(response, 'Action impossible.'), 'error');
+            }
+        }).fail(() => {
+            showToast('Action impossible.', 'error');
         });
     });
 
@@ -517,7 +626,7 @@ jQuery(document).ready(function ($) {
 
     $('#export-csv').on('click', function () {
         const rows = [];
-        rows.push(['Nom', 'Référence', 'Catégories', 'Tags', 'Prix achat', 'Prix vente', 'Stock', 'Marge']);
+        rows.push(['Nom', 'Référence', 'Casier', 'Catégories', 'Tags', 'Prix achat', 'Prix vente', 'Stock', 'Marge', 'Suivi']);
 
         $tableBody.find('tr').each(function () {
             const $row = $(this);
@@ -529,12 +638,14 @@ jQuery(document).ready(function ($) {
             const reference = $row.find('.item-reference').text().trim();
             const categoriesText = $row.find('.item-categories').text().replace(/\s+/g, ' ').trim();
             const tagsText = $row.find('.item-tags').text().replace(/\s+/g, ' ').trim();
+            const casier = $row.find('.cell-location').text().trim() || 'Non renseigné';
             const prixAchat = $row.find('[data-field="prix_achat"]').text().trim();
             const prixVente = $row.find('[data-field="prix_vente"]').text().trim();
             const stock = $row.find('[data-field="stock"]').text().trim();
             const marge = $row.find('.cell-marge').text().trim();
+            const suivi = $row.find('.follow-up-toggle').text().trim();
 
-            rows.push([nom, reference, categoriesText, tagsText, prixAchat, prixVente, stock, marge]);
+            rows.push([nom, reference, casier, categoriesText, tagsText, prixAchat, prixVente, stock, marge, suivi]);
         });
 
         const csvContent = rows

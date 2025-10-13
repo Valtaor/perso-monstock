@@ -8,6 +8,10 @@
     --inventory-text: #333333;
     --inventory-white: #ffffff;
     --inventory-shadow: 0 12px 30px rgba(196, 123, 131, 0.12);
+    --inventory-success: #28a745;
+    --inventory-success-soft: rgba(40, 167, 69, 0.12);
+    --inventory-warning: #ffc107;
+    --inventory-warning-soft: rgba(255, 193, 7, 0.18);
 }
 
 .inventory-page {
@@ -16,6 +20,25 @@
     padding: 60px 20px;
     color: var(--inventory-text);
     min-height: 100vh;
+}
+
+.screen-reader-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+.screen-reader-text:focus {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    clip: auto;
 }
 
 .inventory-wrapper {
@@ -109,6 +132,105 @@
 textarea.form-control {
     resize: vertical;
     min-height: 120px;
+}
+
+.follow-up-card {
+    margin: 20px 0 32px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 16px;
+    padding: 20px 22px;
+    border: 1px solid rgba(196, 123, 131, 0.16);
+    box-shadow: 0 10px 24px rgba(196, 123, 131, 0.08);
+}
+
+.follow-up-header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.follow-up-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    background: rgba(196, 123, 131, 0.16);
+}
+
+.follow-up-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.follow-up-title {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--inventory-rose);
+}
+
+.follow-up-description {
+    margin: 0;
+    font-size: 0.9rem;
+    color: rgba(51, 51, 51, 0.65);
+}
+
+.follow-up-switch {
+    position: relative;
+    width: 56px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.follow-up-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.follow-up-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--inventory-gray);
+    border-radius: 999px;
+    transition: background 0.2s ease;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.follow-up-slider::before {
+    content: '';
+    position: absolute;
+    width: 26px;
+    height: 26px;
+    left: 2px;
+    top: 2px;
+    background: var(--inventory-white);
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.follow-up-switch input:checked + .follow-up-slider {
+    background: var(--inventory-warning);
+}
+
+.follow-up-switch input:checked + .follow-up-slider::before {
+    transform: translateX(26px);
+}
+
+.follow-up-hints {
+    margin: 16px 0 0;
+    padding-left: 22px;
+    display: grid;
+    gap: 6px;
+    color: rgba(51, 51, 51, 0.68);
+    font-size: 0.88rem;
 }
 
 .image-upload {
@@ -260,7 +382,8 @@ textarea.form-control {
 .inventory-table-wrapper {
     background: rgba(255, 255, 255, 0.95);
     border-radius: 16px;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
     border: 1px solid rgba(196, 123, 131, 0.08);
 }
 
@@ -302,6 +425,99 @@ textarea.form-control {
     transform: translateY(-1px);
 }
 
+.inventory-table tbody tr.needs-follow-up {
+    background: var(--inventory-warning-soft);
+    box-shadow: inset 3px 0 0 0 var(--inventory-warning);
+}
+
+.inventory-table tbody tr.needs-follow-up:hover {
+    background: rgba(255, 193, 7, 0.25);
+}
+
+.inventory-table th:nth-child(3),
+.inventory-table td.cell-location {
+    min-width: 140px;
+}
+
+.inventory-table th:nth-child(8),
+.inventory-table td.cell-follow-up {
+    text-align: center;
+    min-width: 150px;
+}
+
+.inventory-table td.cell-follow-up {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.inventory-table td.cell-location {
+    position: relative;
+    word-break: break-word;
+}
+
+.inventory-table td.cell-location.is-empty {
+    background: rgba(255, 193, 7, 0.14);
+}
+
+.inventory-table td.cell-location:focus {
+    outline: none;
+    border-radius: 10px;
+}
+
+.inventory-table td.cell-location:not(.is-empty):focus {
+    box-shadow: inset 0 0 0 2px rgba(196, 123, 131, 0.25);
+}
+
+.inventory-table td.cell-location.is-empty:focus {
+    box-shadow: inset 0 0 0 2px rgba(255, 193, 7, 0.35);
+}
+
+.inventory-table [contenteditable][data-placeholder]:empty:before {
+    content: attr(data-placeholder);
+    color: rgba(51, 51, 51, 0.45);
+    font-style: italic;
+}
+
+.inventory-table td.cell-location.is-empty[contenteditable][data-placeholder]:empty:before {
+    color: #8a5a00;
+}
+
+.follow-up-toggle {
+    border: none;
+    border-radius: 999px;
+    padding: 8px 18px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--inventory-success-soft);
+    color: var(--inventory-success);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    box-shadow: 0 6px 14px rgba(40, 167, 69, 0.18);
+}
+
+.follow-up-toggle.is-pending {
+    background: var(--inventory-warning-soft);
+    color: #8a5a00;
+    box-shadow: 0 6px 14px rgba(255, 193, 7, 0.22);
+}
+
+.follow-up-toggle.is-complete {
+    background: var(--inventory-success-soft);
+    color: var(--inventory-success);
+}
+
+.follow-up-toggle:hover,
+.follow-up-toggle:focus-visible {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    outline: none;
+}
+
+.follow-up-toggle:active {
+    transform: translateY(0);
+}
+
 .inventory-thumb {
     width: 72px;
     height: 72px;
@@ -329,6 +545,27 @@ textarea.form-control {
 .item-reference {
     font-size: 0.85rem;
     color: rgba(51, 51, 51, 0.55);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.item-reference span:first-child {
+    display: inline-flex;
+}
+
+.follow-up-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--inventory-warning-soft);
+    color: #8a5a00;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
 }
 
 .inventory-editable {
@@ -451,6 +688,20 @@ textarea.form-control {
 
     .inventory-form .form-grid {
         grid-template-columns: 1fr;
+    }
+
+    .follow-up-card {
+        padding: 18px;
+    }
+
+    .follow-up-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .follow-up-switch {
+        align-self: flex-start;
     }
 
     .inventory-data-header {

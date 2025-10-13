@@ -44,6 +44,10 @@ require_once __DIR__ . '/db_connect.php';
  *     CONSTRAINT fk_pt_tag FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
  * );
  *
+ * ALTER TABLE produits
+ *     ADD COLUMN casier_emplacement VARCHAR(120) NULL AFTER image,
+ *     ADD COLUMN a_renseigner_plus_tard TINYINT(1) NOT NULL DEFAULT 0 AFTER casier_emplacement;
+ *
  * Indexes peuvent être ajoutés sur nom pour faciliter la recherche.
  *
  * -----------------------------------------------------------------------------
@@ -276,6 +280,18 @@ function inventory_handle_add_product(): void
     $prixVente = isset($_POST['prix_vente']) ? (float) wp_unslash((string) $_POST['prix_vente']) : 0.0;
     $stock = isset($_POST['stock']) ? (int) wp_unslash((string) $_POST['stock']) : 0;
     $description = isset($_POST['description']) ? sanitize_textarea_field(wp_unslash((string) $_POST['description'])) : '';
+    $casier = isset($_POST['casier_emplacement']) ? sanitize_text_field(wp_unslash((string) $_POST['casier_emplacement'])) : '';
+    if ($casier !== '') {
+        $casier = mb_substr($casier, 0, 120);
+    }
+    $followUpRaw = isset($_POST['a_renseigner_plus_tard'])
+        ? filter_var(
+            wp_unslash((string) $_POST['a_renseigner_plus_tard']),
+            FILTER_VALIDATE_BOOLEAN,
+            FILTER_NULL_ON_FAILURE
+        )
+        : false;
+    $followUpFlag = $followUpRaw ? 1 : 0;
     $categoryIds = inventory_sanitize_id_list($_POST['categories'] ?? []);
     $tagIds = inventory_sanitize_id_list($_POST['tags'] ?? []);
 
@@ -347,8 +363,8 @@ function inventory_handle_add_product(): void
         $pdo->beginTransaction();
 
         $stmt = $pdo->prepare(
-            'INSERT INTO produits (nom, reference, prix_achat, prix_vente, stock, description, image, ajoute_par)'
-            . ' VALUES (:nom, :reference, :prix_achat, :prix_vente, :stock, :description, :image, :ajoute_par)'
+            'INSERT INTO produits (nom, reference, prix_achat, prix_vente, stock, description, image, casier_emplacement, a_renseigner_plus_tard, ajoute_par)'
+            . ' VALUES (:nom, :reference, :prix_achat, :prix_vente, :stock, :description, :image, :casier_emplacement, :a_renseigner_plus_tard, :ajoute_par)'
         );
 
         $stmt->execute([
@@ -359,6 +375,8 @@ function inventory_handle_add_product(): void
             ':stock' => $stock,
             ':description' => $description,
             ':image' => $imageName,
+            ':casier_emplacement' => $casier,
+            ':a_renseigner_plus_tard' => $followUpFlag ? 1 : 0,
             ':ajoute_par' => $ajoutePar,
         ]);
 
@@ -439,6 +457,8 @@ function inventory_handle_get_products(): void
             $row['prix_achat'] = isset($row['prix_achat']) ? (float) $row['prix_achat'] : 0.0;
             $row['prix_vente'] = isset($row['prix_vente']) ? (float) $row['prix_vente'] : 0.0;
             $row['stock'] = isset($row['stock']) ? (int) $row['stock'] : 0;
+            $row['a_renseigner_plus_tard'] = isset($row['a_renseigner_plus_tard']) ? (int) $row['a_renseigner_plus_tard'] : 0;
+            $row['casier_emplacement'] = isset($row['casier_emplacement']) ? (string) $row['casier_emplacement'] : '';
             $products[] = $row;
         }
 
@@ -559,6 +579,8 @@ function inventory_handle_update_product(): void
         'prix_achat' => 'float',
         'prix_vente' => 'float',
         'stock' => 'int',
+        'casier_emplacement' => 'string',
+        'a_renseigner_plus_tard' => 'bool',
     ];
 
     if ($id <= 0 || !isset($allowedFields[$field])) {
@@ -584,6 +606,13 @@ function inventory_handle_update_product(): void
             }
             $value = round($value, 2);
             break;
+        case 'string':
+            $value = sanitize_text_field((string) $value);
+            $value = mb_substr($value, 0, 120);
+            break;
+        case 'bool':
+            $value = filter_var($value, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+            break;
     }
 
     try {
@@ -604,6 +633,8 @@ function inventory_handle_update_product(): void
 
     wp_send_json_success([
         'message' => 'Produit mis à jour.',
+        'field' => $field,
+        'value' => $value,
     ]);
 }
 
