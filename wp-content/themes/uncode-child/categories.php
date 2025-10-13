@@ -11,7 +11,7 @@ if (!is_user_logged_in()) {
     return;
 }
 ?>
-<div class="inventory-taxonomy-manager">
+<div id="inventory-taxonomy-manager" class="inventory-taxonomy-manager">
     <section class="inventory-card taxonomy-card taxonomy-categories">
         <div class="taxonomy-header">
             <div>

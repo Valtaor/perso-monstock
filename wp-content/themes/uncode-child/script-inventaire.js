@@ -33,6 +33,17 @@ jQuery(document).ready(function ($) {
     const $modalForm = $('#inventory-term-form');
     const $modalTitle = $('#inventory-term-modal-title');
     const baseModalTitle = $modalTitle.text();
+    const $advancedFields = $('#inventory-advanced-fields');
+    const $advancedToggle = $('.advanced-toggle');
+    const $quickAdvancedButton = $('#quick-open-advanced');
+    const $scrollToInventory = $('#scroll-to-inventory');
+    const $inventoryBoard = $('#inventory-board');
+    const $taxonomyManager = $('#inventory-taxonomy-manager');
+    const $termManagerButton = $('#open-term-manager');
+    const advancedToggleLabelShow = $advancedToggle.find('.toggle-label').text() || 'Afficher les options avancées';
+    const advancedToggleLabelHide = 'Masquer les options avancées';
+    const quickAdvancedLabelShow = $quickAdvancedButton.text() || 'Options avancées';
+    const quickAdvancedLabelHide = 'Fermer les options avancées';
 
     function escapeHtml(value) {
         return $('<div>').text(value ?? '').html();
@@ -47,6 +58,45 @@ jQuery(document).ready(function ($) {
             return trimmed;
         }
         return '#c47b83';
+    }
+
+    function scrollToSection($target, highlight = false) {
+        if (!$target || !$target.length) {
+            return;
+        }
+        const offsetTop = Math.max($target.offset().top - 80, 0);
+        $('html, body').animate({ scrollTop: offsetTop }, 480);
+        if (highlight) {
+            $target.addClass('section-highlight');
+            setTimeout(() => {
+                $target.removeClass('section-highlight');
+            }, 1600);
+        }
+    }
+
+    function setAdvancedState(expanded, animate = false) {
+        if (!$advancedFields.length) {
+            return;
+        }
+        const isExpanded = Boolean(expanded);
+        if (isExpanded) {
+            $advancedFields.removeAttr('hidden');
+        } else {
+            $advancedFields.attr('hidden', 'hidden');
+        }
+        if ($advancedToggle.length) {
+            $advancedToggle.attr('aria-expanded', isExpanded ? 'true' : 'false');
+            $advancedToggle.toggleClass('is-open', isExpanded);
+            $advancedToggle.find('.toggle-label').text(isExpanded ? advancedToggleLabelHide : advancedToggleLabelShow);
+        }
+        if ($quickAdvancedButton.length) {
+            $quickAdvancedButton.attr('aria-expanded', isExpanded ? 'true' : 'false');
+            $quickAdvancedButton.toggleClass('is-active', isExpanded);
+            $quickAdvancedButton.text(isExpanded ? quickAdvancedLabelHide : quickAdvancedLabelShow);
+        }
+        if (isExpanded && animate) {
+            scrollToSection($advancedFields, false);
+        }
     }
 
     function formatCurrency(value) {
@@ -150,6 +200,40 @@ jQuery(document).ready(function ($) {
             $toast.removeClass('visible');
             setTimeout(() => $toast.remove(), 300);
         }, 3000);
+    }
+
+    if ($advancedFields.length) {
+        setAdvancedState(false);
+    }
+
+    if ($advancedToggle.length) {
+        $advancedToggle.on('click', function (event) {
+            event.preventDefault();
+            const willOpen = $advancedToggle.attr('aria-expanded') !== 'true';
+            setAdvancedState(willOpen, true);
+        });
+    }
+
+    if ($quickAdvancedButton.length) {
+        $quickAdvancedButton.on('click', function (event) {
+            event.preventDefault();
+            const willOpen = $(this).attr('aria-expanded') !== 'true';
+            setAdvancedState(willOpen, true);
+        });
+    }
+
+    if ($scrollToInventory.length && $inventoryBoard.length) {
+        $scrollToInventory.on('click', function (event) {
+            event.preventDefault();
+            scrollToSection($inventoryBoard, true);
+        });
+    }
+
+    if ($termManagerButton.length && $taxonomyManager.length) {
+        $termManagerButton.on('click', function (event) {
+            event.preventDefault();
+            scrollToSection($taxonomyManager, true);
+        });
     }
 
     function responseMessage(response, fallback) {

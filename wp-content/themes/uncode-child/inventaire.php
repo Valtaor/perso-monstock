@@ -48,124 +48,151 @@ get_header();
         </section>
     <?php else : ?>
         <div class="inventory-wrapper">
-            <div class="inventory-columns">
-                <section class="inventory-card inventory-form-card">
-                    <h1 class="inventory-title"><?php echo esc_html('Ajouter un bijou ou un objet vintage'); ?></h1>
-                    <p class="inventory-subtitle"><?php echo esc_html('Complétez les informations pour enrichir votre collection en quelques clics.'); ?></p>
+            <section class="inventory-hero" aria-labelledby="inventory-hero-title">
+                <div class="hero-intro">
+                    <span class="hero-kicker"><?php echo esc_html('Tableau de bord inventaire'); ?></span>
+                    <h1 id="inventory-hero-title" class="hero-title"><?php echo esc_html('Gérez vos bijoux en un clin d’œil'); ?></h1>
+                    <p class="hero-description"><?php echo esc_html('Ajoutez une pièce, visualisez vos stocks et pilotez votre collection sans quitter cet écran.'); ?></p>
+                    <div class="hero-actions">
+                        <button type="button" class="inventory-button secondary-button" id="open-term-manager"><?php echo esc_html('Gérer les catégories & tags'); ?></button>
+                        <button type="button" class="inventory-button ghost-button" id="scroll-to-inventory"><?php echo esc_html('Voir l\'inventaire'); ?></button>
+                    </div>
+                </div>
+                <div class="hero-stats">
+                    <article class="stat-card">
+                        <h3><?php echo esc_html('Articles en stock'); ?></h3>
+                        <span id="stat-total-articles" class="stat-value">0</span>
+                    </article>
+                    <article class="stat-card">
+                        <h3><?php echo esc_html('Valeur d\'achat'); ?></h3>
+                        <span id="stat-valeur-achat" class="stat-value">0 €</span>
+                    </article>
+                    <article class="stat-card">
+                        <h3><?php echo esc_html('Valeur de vente'); ?></h3>
+                        <span id="stat-valeur-vente" class="stat-value">0 €</span>
+                    </article>
+                    <article class="stat-card">
+                        <h3><?php echo esc_html('Marge estimée'); ?></h3>
+                        <span id="stat-marge-totale" class="stat-value">0 €</span>
+                    </article>
+                </div>
+            </section>
+
+            <div class="inventory-main-grid">
+                <section class="inventory-card quick-add-card" id="quick-add-card">
+                    <header class="quick-add-header">
+                        <div>
+                            <h2><?php echo esc_html('Ajoutez une nouvelle pièce'); ?></h2>
+                            <p><?php echo esc_html('Un formulaire compact pour saisir immédiatement les informations clés.'); ?></p>
+                        </div>
+                        <div class="quick-add-shortcuts">
+                            <button type="button" class="inventory-button ghost-button" id="quick-open-advanced" aria-expanded="false" aria-controls="inventory-advanced-fields">
+                                <?php echo esc_html('Options avancées'); ?>
+                            </button>
+                        </div>
+                    </header>
 
                     <form id="inventory-form" class="inventory-form" enctype="multipart/form-data">
-                        <div class="form-section">
-                            <label for="product-image" class="form-label"><?php echo esc_html('Photo'); ?></label>
-                            <div class="image-upload">
-                                <div class="image-preview-wrapper">
-                                    <img id="image-preview" class="image-preview is-empty" src="" alt="<?php echo esc_attr('Aperçu de l\'image'); ?>" />
-                                    <span class="image-placeholder"><?php echo esc_html('Ajoutez une jolie photo de votre pièce'); ?></span>
+                        <div class="quick-add-grid">
+                            <div class="quick-add-media">
+                                <div class="image-upload">
+                                    <div class="image-preview-wrapper">
+                                        <img id="image-preview" class="image-preview is-empty" src="" alt="<?php echo esc_attr('Aperçu de l\'image'); ?>" />
+                                        <span class="image-placeholder"><?php echo esc_html('Ajoutez une jolie photo de votre pièce'); ?></span>
+                                    </div>
+                                    <label class="image-upload-button" for="product-image"><?php echo esc_html('Choisir une image'); ?></label>
+                                    <input type="file" id="product-image" name="image" accept="image/*" />
                                 </div>
-                                <label class="image-upload-button" for="product-image"><?php echo esc_html('Choisir une image'); ?></label>
-                                <input type="file" id="product-image" name="image" accept="image/*" />
                             </div>
-                        </div>
-
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label for="product-name" class="form-label"><?php echo esc_html('Nom de l\'objet'); ?></label>
-                                <input type="text" id="product-name" name="nom" class="form-control" placeholder="Bague art déco, broche vintage..." required />
-                            </div>
-                            <div class="form-group">
-                                <label for="product-reference" class="form-label"><?php echo esc_html('Référence'); ?></label>
-                                <input type="text" id="product-reference" name="reference" class="form-control" placeholder="REF-001" required />
-                            </div>
-                            <div class="form-group">
-                                <label for="product-location" class="form-label"><?php echo esc_html('Casier / Emplacement'); ?></label>
-                                <input type="text" id="product-location" name="casier_emplacement" class="form-control" placeholder="Ex : A1, Bx1" maxlength="120" />
-                            </div>
-                            <div class="form-group">
-                                <label for="product-prix-achat" class="form-label"><?php echo esc_html('Prix d\'achat (€)'); ?></label>
-                                <input type="number" step="0.01" min="0" id="product-prix-achat" name="prix_achat" class="form-control" placeholder="0.00" />
-                            </div>
-                            <div class="form-group">
-                                <label for="product-prix-vente" class="form-label"><?php echo esc_html('Prix de vente (€)'); ?></label>
-                                <input type="number" step="0.01" min="0" id="product-prix-vente" name="prix_vente" class="form-control" placeholder="0.00" />
-                            </div>
-                            <div class="form-group">
-                                <label for="product-stock" class="form-label"><?php echo esc_html('Stock disponible'); ?></label>
-                                <input type="number" min="0" id="product-stock" name="stock" class="form-control" placeholder="1" />
-                            </div>
-                        </div>
-
-                        <div class="form-grid form-grid-terms">
-                            <div class="form-group">
-                                <label for="product-categories" class="form-label"><?php echo esc_html('Catégories'); ?></label>
-                                <select id="product-categories" name="categories[]" class="form-control multi-select" multiple data-placeholder="<?php echo esc_attr('Sélectionnez des catégories'); ?>"></select>
-                                <small class="form-hint"><?php echo esc_html('Affectez une ou plusieurs catégories colorées à votre pièce.'); ?></small>
-                            </div>
-                            <div class="form-group">
-                                <label for="product-tags" class="form-label"><?php echo esc_html('Tags'); ?></label>
-                                <select id="product-tags" name="tags[]" class="form-control multi-select" multiple data-placeholder="<?php echo esc_attr('Ajoutez des tags inspirants'); ?>"></select>
-                                <small class="form-hint"><?php echo esc_html('Mots-clés libres pour affiner vos recherches.'); ?></small>
-                            </div>
-                        </div>
-
-                        <div class="form-section">
-                            <label for="product-description" class="form-label"><?php echo esc_html('Description'); ?></label>
-                            <textarea id="product-description" name="description" class="form-control" rows="4" placeholder="Détails, matériaux, époque..."></textarea>
-                        </div>
-
-                        <aside class="follow-up-card" aria-labelledby="follow-up-title">
-                            <div class="follow-up-header">
-                                <div class="follow-up-icon" aria-hidden="true">📝</div>
-                                <div class="follow-up-text">
-                                    <span id="follow-up-title" class="follow-up-title"><?php echo esc_html('À renseigner plus tard'); ?></span>
-                                    <p class="follow-up-description"><?php echo esc_html('Activez cette option pour vous rappeler qu’il manque des informations sur cet objet.'); ?></p>
+                            <div class="quick-add-fields">
+                                <div class="form-grid form-grid-compact">
+                                    <div class="form-group">
+                                        <label for="product-name" class="form-label"><?php echo esc_html('Nom de l\'objet'); ?></label>
+                                        <input type="text" id="product-name" name="nom" class="form-control" placeholder="Bague art déco, broche vintage..." required />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="product-reference" class="form-label"><?php echo esc_html('Référence'); ?></label>
+                                        <input type="text" id="product-reference" name="reference" class="form-control" placeholder="REF-001" required />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="product-location" class="form-label"><?php echo esc_html('Casier / Emplacement'); ?></label>
+                                        <input type="text" id="product-location" name="casier_emplacement" class="form-control" placeholder="Ex : A1, Bx1" maxlength="120" />
+                                    </div>
                                 </div>
-                                <label class="follow-up-switch" for="product-follow-up">
-                                    <input type="checkbox" id="product-follow-up" name="a_renseigner_plus_tard" value="1" />
-                                    <span class="follow-up-slider" aria-hidden="true"></span>
-                                    <span class="screen-reader-text"><?php echo esc_html('Marquer l’objet comme à compléter plus tard'); ?></span>
-                                </label>
+                                <div class="form-grid form-grid-pricing">
+                                    <div class="form-group">
+                                        <label for="product-prix-achat" class="form-label"><?php echo esc_html('Prix d\'achat (€)'); ?></label>
+                                        <input type="number" step="0.01" min="0" id="product-prix-achat" name="prix_achat" class="form-control" placeholder="0.00" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="product-prix-vente" class="form-label"><?php echo esc_html('Prix de vente (€)'); ?></label>
+                                        <input type="number" step="0.01" min="0" id="product-prix-vente" name="prix_vente" class="form-control" placeholder="0.00" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="product-stock" class="form-label"><?php echo esc_html('Stock disponible'); ?></label>
+                                        <input type="number" min="0" id="product-stock" name="stock" class="form-control" placeholder="1" />
+                                    </div>
+                                </div>
+                                <div class="follow-up-banner" aria-labelledby="follow-up-title">
+                                    <div class="follow-up-content">
+                                        <div class="follow-up-icon" aria-hidden="true">📝</div>
+                                        <div>
+                                            <span id="follow-up-title" class="follow-up-title"><?php echo esc_html('À renseigner plus tard'); ?></span>
+                                            <p class="follow-up-description"><?php echo esc_html('Gardez en vue les fiches incomplètes grâce à un rappel visuel.'); ?></p>
+                                        </div>
+                                    </div>
+                                    <label class="follow-up-switch" for="product-follow-up">
+                                        <input type="checkbox" id="product-follow-up" name="a_renseigner_plus_tard" value="1" />
+                                        <span class="follow-up-slider" aria-hidden="true"></span>
+                                        <span class="screen-reader-text"><?php echo esc_html('Marquer l’objet comme à compléter plus tard'); ?></span>
+                                    </label>
+                                </div>
+                                <button type="button" class="advanced-toggle" data-target="#inventory-advanced-fields" aria-expanded="false">
+                                    <span class="toggle-icon" aria-hidden="true">➕</span>
+                                    <span class="toggle-label"><?php echo esc_html('Afficher les options avancées'); ?></span>
+                                </button>
                             </div>
-                            <ul class="follow-up-hints">
-                                <li><?php echo esc_html('Les objets marqués affichent un badge orange dans l’inventaire.'); ?></li>
-                                <li><?php echo esc_html('Pensez à compléter ces fiches pour ne rien oublier.'); ?></li>
-                            </ul>
-                        </aside>
+                        </div>
 
-                        <button type="submit" class="inventory-button primary-button"><?php echo esc_html('Ajouter à l\'inventaire'); ?></button>
+                        <div id="inventory-advanced-fields" class="advanced-fields" hidden>
+                            <div class="form-grid form-grid-terms">
+                                <div class="form-group">
+                                    <label for="product-categories" class="form-label"><?php echo esc_html('Catégories'); ?></label>
+                                    <select id="product-categories" name="categories[]" class="form-control multi-select" multiple data-placeholder="<?php echo esc_attr('Sélectionnez des catégories'); ?>"></select>
+                                    <small class="form-hint"><?php echo esc_html('Affectez une ou plusieurs catégories colorées à votre pièce.'); ?></small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="product-tags" class="form-label"><?php echo esc_html('Tags'); ?></label>
+                                    <select id="product-tags" name="tags[]" class="form-control multi-select" multiple data-placeholder="<?php echo esc_attr('Ajoutez des tags inspirants'); ?>"></select>
+                                    <small class="form-hint"><?php echo esc_html('Mots-clés libres pour affiner vos recherches.'); ?></small>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <label for="product-description" class="form-label"><?php echo esc_html('Description'); ?></label>
+                                <textarea id="product-description" name="description" class="form-control" rows="4" placeholder="Détails, matériaux, époque..."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="inventory-button primary-button"><?php echo esc_html('Ajouter à l\'inventaire'); ?></button>
+                        </div>
                     </form>
                 </section>
 
-                <section class="inventory-card inventory-data-card">
-                    <div class="inventory-data-header">
+                <section class="inventory-card inventory-board" id="inventory-board">
+                    <div class="board-header">
                         <div>
-                            <h2><?php echo esc_html('Aperçu de l\'inventaire'); ?></h2>
-                            <p><?php echo esc_html('Statistiques mises à jour en temps réel pour piloter vos ventes.'); ?></p>
+                            <h2><?php echo esc_html('Inventaire en temps réel'); ?></h2>
+                            <p><?php echo esc_html('Filtrez, cherchez et exportez vos données sans quitter la page.'); ?></p>
                         </div>
-                        <div class="inventory-actions">
+                        <div class="board-actions">
                             <input type="text" id="inventory-search" class="form-control search-input" placeholder="Rechercher un bijou..." aria-label="<?php echo esc_attr('Rechercher'); ?>" />
                             <button type="button" id="export-csv" class="inventory-button ghost-button"><?php echo esc_html('Exporter CSV'); ?></button>
                         </div>
                     </div>
 
-                    <div class="inventory-stats-grid">
-                        <article class="stat-card">
-                            <h3><?php echo esc_html('Articles en stock'); ?></h3>
-                            <span id="stat-total-articles" class="stat-value">0</span>
-                        </article>
-                        <article class="stat-card">
-                            <h3><?php echo esc_html('Valeur d\'achat'); ?></h3>
-                            <span id="stat-valeur-achat" class="stat-value">0 €</span>
-                        </article>
-                        <article class="stat-card">
-                            <h3><?php echo esc_html('Valeur de vente'); ?></h3>
-                            <span id="stat-valeur-vente" class="stat-value">0 €</span>
-                        </article>
-                        <article class="stat-card">
-                            <h3><?php echo esc_html('Marge estimée'); ?></h3>
-                            <span id="stat-marge-totale" class="stat-value">0 €</span>
-                        </article>
-                    </div>
-
-                    <div class="inventory-filters">
+                    <div class="board-filters">
                         <div class="filter-group">
                             <label for="filter-categories"><?php echo esc_html('Filtrer par catégories'); ?></label>
                             <select id="filter-categories" class="form-control multi-select" multiple data-placeholder="<?php echo esc_attr('Toutes les catégories'); ?>"></select>
