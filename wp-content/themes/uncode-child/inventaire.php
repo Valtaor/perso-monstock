@@ -26,8 +26,9 @@ wp_localize_script(
     'inventory-script',
     'inventorySettings',
     [
-        'ajaxUrl' => get_stylesheet_directory_uri() . '/includes/functions_inventaire.php',
-        'uploadsUrl' => get_stylesheet_directory_uri() . '/uploads/',
+        'ajaxUrl'    => admin_url('admin-ajax.php'),
+        'nonce'      => wp_create_nonce('inventory_nonce'),
+        'uploadsUrl' => trailingslashit(get_stylesheet_directory_uri() . '/uploads'),
     ]
 );
 

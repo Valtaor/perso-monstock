@@ -1,6 +1,7 @@
 jQuery(document).ready(function ($) {
     const ajaxUrl = inventorySettings.ajaxUrl;
     const uploadsUrl = inventorySettings.uploadsUrl;
+    const nonce = inventorySettings.nonce;
 
     const $tableBody = $('#inventory-table-body');
     const $statsTotalArticles = $('#stat-total-articles');
@@ -74,11 +75,21 @@ jQuery(document).ready(function ($) {
         }, 3000);
     }
 
+    function responseMessage(response, fallback) {
+        if (response && response.data && typeof response.data.message !== 'undefined') {
+            return response.data.message;
+        }
+        if (response && typeof response.message !== 'undefined') {
+            return response.message;
+        }
+        return fallback;
+    }
+
     function loadProducts() {
         $.ajax({
             url: ajaxUrl,
-            method: 'GET',
-            data: { action: 'get_products' },
+            method: 'POST',
+            data: { action: 'inventory_get_products', nonce },
             dataType: 'json',
         }).done((response) => {
             if (response.success) {
@@ -90,7 +101,10 @@ jQuery(document).ready(function ($) {
                 const rows = response.data.map((product) => buildRow(product)).join('');
                 $tableBody.html(rows);
                 updateSearchFilter();
+                return;
             }
+
+            showToast(responseMessage(response, 'Impossible de charger les produits.'), 'error');
         }).fail(() => {
             showToast('Impossible de charger les produits.', 'error');
         });
@@ -99,8 +113,8 @@ jQuery(document).ready(function ($) {
     function loadStats() {
         $.ajax({
             url: ajaxUrl,
-            method: 'GET',
-            data: { action: 'get_stats' },
+            method: 'POST',
+            data: { action: 'inventory_get_stats', nonce },
             dataType: 'json',
         }).done((response) => {
             if (response.success && response.data) {
@@ -127,7 +141,8 @@ jQuery(document).ready(function ($) {
     $('#inventory-form').on('submit', function (event) {
         event.preventDefault();
         const formData = new FormData(this);
-        formData.append('action', 'add_product');
+        formData.append('action', 'inventory_add_product');
+        formData.append('nonce', nonce);
 
         $.ajax({
             url: ajaxUrl,
@@ -140,11 +155,11 @@ jQuery(document).ready(function ($) {
             if (response.success) {
                 this.reset();
                 $('#image-preview').attr('src', '').addClass('is-empty');
-                showToast(response.message || 'Produit ajouté.');
+                showToast(responseMessage(response, 'Produit ajouté.'));
                 loadProducts();
                 loadStats();
             } else {
-                showToast(response.message || 'Erreur lors de l\'ajout.', 'error');
+                showToast(responseMessage(response, 'Erreur lors de l\'ajout.'), 'error');
             }
         }).fail(() => {
             showToast('Erreur lors de l\'ajout du produit.', 'error');
@@ -176,18 +191,18 @@ jQuery(document).ready(function ($) {
         $.ajax({
             url: ajaxUrl,
             method: 'POST',
-            data: { action: 'delete_product', id },
+            data: { action: 'inventory_delete_product', id, nonce },
             dataType: 'json',
         }).done((response) => {
             if (response.success) {
-                showToast(response.message || 'Article supprimé.');
+                showToast(responseMessage(response, 'Article supprimé.'));
                 $row.remove();
                 if ($tableBody.find('tr').length === 0) {
                     showEmptyState();
                 }
                 loadStats();
             } else {
-                showToast(response.message || 'Suppression impossible.', 'error');
+                showToast(responseMessage(response, 'Suppression impossible.'), 'error');
             }
         }).fail(() => {
             showToast('Suppression impossible.', 'error');
@@ -231,11 +246,11 @@ jQuery(document).ready(function ($) {
         $.ajax({
             url: ajaxUrl,
             method: 'POST',
-            data: { action: 'update_product', id, field, value },
+            data: { action: 'inventory_update_product', id, field, value, nonce },
             dataType: 'json',
         }).done((response) => {
             if (response.success) {
-                showToast('Valeur mise à jour.');
+                showToast(responseMessage(response, 'Valeur mise à jour.'));
                 const prixAchat = parseFloat($cell.closest('tr').find('[data-field="prix_achat"]').text().replace(',', '.')) || 0;
                 const prixVente = parseFloat($cell.closest('tr').find('[data-field="prix_vente"]').text().replace(',', '.')) || 0;
                 const marge = prixVente - prixAchat;
@@ -243,7 +258,7 @@ jQuery(document).ready(function ($) {
                 loadStats();
             } else {
                 $cell.text(original);
-                showToast(response.message || 'Mise à jour impossible.', 'error');
+                showToast(responseMessage(response, 'Mise à jour impossible.'), 'error');
             }
         }).fail(() => {
             $cell.text(original);

@@ -1,228 +1,295 @@
 <?php
 /**
- * AJAX handler for the inventory application.
+ * AJAX handlers for the inventory application.
  */
 
 declare(strict_types=1);
 
-// Bootstrap WordPress to leverage authentication helpers when available.
-$rootPath = dirname(__FILE__, 5);
-if (!defined('WP_USE_THEMES')) {
-    define('WP_USE_THEMES', false);
-}
-if (is_dir($rootPath) && file_exists($rootPath . '/wp-load.php')) {
-    require_once $rootPath . '/wp-load.php';
+if (!defined('ABSPATH')) {
+    exit;
 }
 
 require_once __DIR__ . '/db_connect.php';
 
-header('Content-Type: application/json; charset=utf-8');
-
-/**
- * Output a JSON response and terminate.
- */
-function inventory_json_response(array $payload, int $statusCode = 200): void
+function inventory_debug_enabled(): bool
 {
-    http_response_code($statusCode);
-    echo json_encode($payload);
-    exit;
-}
-
-if (function_exists('is_user_logged_in') && !is_user_logged_in()) {
-    inventory_json_response([
-        'success' => false,
-        'message' => 'Authentification requise.',
-    ], 401);
-}
-
-global $pdo;
-
-$action = $_REQUEST['action'] ?? '';
-
-switch ($action) {
-    case 'add_product':
-        handle_add_product($pdo);
-        break;
-    case 'get_products':
-        handle_get_products($pdo);
-        break;
-    case 'delete_product':
-        handle_delete_product($pdo);
-        break;
-    case 'get_stats':
-        handle_get_stats($pdo);
-        break;
-    case 'update_product':
-        handle_update_product($pdo);
-        break;
-    default:
-        inventory_json_response([
-            'success' => false,
-            'message' => 'Action non reconnue.',
-        ], 400);
+    return defined('WP_DEBUG') && WP_DEBUG;
 }
 
 /**
- * Handle the creation of a new product.
+ * Ensure the current request is authorised.
  */
-function handle_add_product(PDO $pdo): void
+function inventory_verify_request(): void
 {
-    $nom = trim($_POST['nom'] ?? '');
-    $reference = trim($_POST['reference'] ?? '');
-    $prixAchat = isset($_POST['prix_achat']) ? (float) $_POST['prix_achat'] : 0.0;
-    $prixVente = isset($_POST['prix_vente']) ? (float) $_POST['prix_vente'] : 0.0;
-    $stock = isset($_POST['stock']) ? (int) $_POST['stock'] : 0;
-    $description = trim($_POST['description'] ?? '');
-
-    if ($nom === '' || $reference === '') {
-        inventory_json_response([
-            'success' => false,
-            'message' => 'Merci de renseigner au minimum le nom et la référence.',
-        ], 422);
+    if (!is_user_logged_in()) {
+        wp_send_json_error(
+            [
+                'message' => 'Authentification requise.',
+            ],
+            401
+        );
     }
 
-    $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    $nonce = isset($_REQUEST['nonce']) ? sanitize_text_field(wp_unslash((string) $_REQUEST['nonce'])) : '';
+    if ($nonce === '' || !wp_verify_nonce($nonce, 'inventory_nonce')) {
+        wp_send_json_error(
+            [
+                'message' => 'Requête non autorisée.',
+            ],
+            403
+        );
+    }
+}
+
+/**
+ * Obtain a PDO instance or send a JSON error response.
+ */
+function inventory_require_pdo(): PDO
+{
+    try {
+        return inventory_acquire_pdo();
+    } catch (Throwable $throwable) {
+        wp_send_json_error(
+            [
+                'message' => 'Connexion à la base de données impossible.',
+                'details' => inventory_debug_enabled() ? $throwable->getMessage() : null,
+            ],
+            500
+        );
+    }
+}
+
+add_action('wp_ajax_inventory_add_product', 'inventory_handle_add_product');
+add_action('wp_ajax_inventory_get_products', 'inventory_handle_get_products');
+add_action('wp_ajax_inventory_delete_product', 'inventory_handle_delete_product');
+add_action('wp_ajax_inventory_get_stats', 'inventory_handle_get_stats');
+add_action('wp_ajax_inventory_update_product', 'inventory_handle_update_product');
+
+/**
+ * Handle product creation.
+ */
+function inventory_handle_add_product(): void
+{
+    inventory_verify_request();
+    $pdo = inventory_require_pdo();
+
+    $nom = isset($_POST['nom']) ? sanitize_text_field(wp_unslash((string) $_POST['nom'])) : '';
+    $reference = isset($_POST['reference']) ? sanitize_text_field(wp_unslash((string) $_POST['reference'])) : '';
+    $prixAchat = isset($_POST['prix_achat']) ? (float) wp_unslash((string) $_POST['prix_achat']) : 0.0;
+    $prixVente = isset($_POST['prix_vente']) ? (float) wp_unslash((string) $_POST['prix_vente']) : 0.0;
+    $stock = isset($_POST['stock']) ? (int) wp_unslash((string) $_POST['stock']) : 0;
+    $description = isset($_POST['description']) ? sanitize_textarea_field(wp_unslash((string) $_POST['description'])) : '';
+
+    if ($nom === '' || $reference === '') {
+        wp_send_json_error(
+            [
+                'message' => 'Merci de renseigner au minimum le nom et la référence.',
+            ],
+            422
+        );
+    }
+
     $imageName = null;
+    $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
     if (!empty($_FILES['image']['name'])) {
         $file = $_FILES['image'];
         if ($file['error'] !== UPLOAD_ERR_OK) {
-            inventory_json_response([
-                'success' => false,
-                'message' => "Erreur lors du téléchargement de l'image.",
-            ], 400);
+            wp_send_json_error(
+                [
+                    'message' => "Erreur lors du téléchargement de l'image.",
+                ],
+                400
+            );
         }
 
         if (class_exists('finfo')) {
             $finfo = new finfo(FILEINFO_MIME_TYPE);
             $mime = $finfo->file($file['tmp_name']);
-        } else {
+        } elseif (function_exists('mime_content_type')) {
             $mime = mime_content_type($file['tmp_name']);
+        } else {
+            $mime = $file['type'] ?? '';
         }
         if (!in_array($mime, $allowedMimes, true)) {
-            inventory_json_response([
-                'success' => false,
-                'message' => "Format d'image non supporté.",
-            ], 415);
+            wp_send_json_error(
+                [
+                    'message' => "Format d'image non supporté.",
+                ],
+                415
+            );
         }
 
         $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
         $imageName = uniqid('inv_', true) . '.' . $extension;
-        $uploadDir = dirname(__FILE__, 1) . '/../uploads/';
+        $uploadDir = trailingslashit(get_stylesheet_directory()) . 'uploads/';
 
         if (!file_exists($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
+            wp_mkdir_p($uploadDir);
         }
 
         if (!move_uploaded_file($file['tmp_name'], $uploadDir . $imageName)) {
-            inventory_json_response([
-                'success' => false,
-                'message' => "Impossible de sauvegarder l'image.",
-            ], 500);
+            wp_send_json_error(
+                [
+                    'message' => "Impossible de sauvegarder l'image.",
+                ],
+                500
+            );
         }
     }
 
     $ajoutePar = 'Système';
-    if (function_exists('wp_get_current_user')) {
-        $currentUser = wp_get_current_user();
-        if ($currentUser instanceof WP_User && $currentUser->exists()) {
-            $ajoutePar = $currentUser->display_name ?: $currentUser->user_login;
-        }
+    $currentUser = wp_get_current_user();
+    if ($currentUser instanceof WP_User && $currentUser->exists()) {
+        $ajoutePar = $currentUser->display_name ?: $currentUser->user_login;
     }
 
-    $stmt = $pdo->prepare('INSERT INTO produits (nom, reference, prix_achat, prix_vente, stock, description, image, ajoute_par) VALUES (:nom, :reference, :prix_achat, :prix_vente, :stock, :description, :image, :ajoute_par)');
+    try {
+        $stmt = $pdo->prepare(
+            'INSERT INTO produits (nom, reference, prix_achat, prix_vente, stock, description, image, ajoute_par)
+             VALUES (:nom, :reference, :prix_achat, :prix_vente, :stock, :description, :image, :ajoute_par)'
+        );
 
-    $stmt->execute([
-        ':nom' => $nom,
-        ':reference' => $reference,
-        ':prix_achat' => $prixAchat,
-        ':prix_vente' => $prixVente,
-        ':stock' => $stock,
-        ':description' => $description,
-        ':image' => $imageName,
-        ':ajoute_par' => $ajoutePar,
-    ]);
+        $stmt->execute([
+            ':nom' => $nom,
+            ':reference' => $reference,
+            ':prix_achat' => $prixAchat,
+            ':prix_vente' => $prixVente,
+            ':stock' => $stock,
+            ':description' => $description,
+            ':image' => $imageName,
+            ':ajoute_par' => $ajoutePar,
+        ]);
+    } catch (PDOException $exception) {
+        wp_send_json_error(
+            [
+                'message' => 'Enregistrement impossible.',
+                'details' => inventory_debug_enabled() ? $exception->getMessage() : null,
+            ],
+            500
+        );
+    }
 
-    inventory_json_response([
-        'success' => true,
+    wp_send_json_success([
         'message' => 'Produit ajouté avec succès.',
     ]);
 }
 
 /**
- * Retrieve products and send them back to the front-end.
+ * Return the list of products.
  */
-function handle_get_products(PDO $pdo): void
+function inventory_handle_get_products(): void
 {
-    $stmt = $pdo->query('SELECT * FROM produits ORDER BY id DESC');
-    $products = [];
+    inventory_verify_request();
+    $pdo = inventory_require_pdo();
 
-    while ($row = $stmt->fetch()) {
-        $row['prix_achat'] = isset($row['prix_achat']) ? (float) $row['prix_achat'] : 0.0;
-        $row['prix_vente'] = isset($row['prix_vente']) ? (float) $row['prix_vente'] : 0.0;
-        $row['stock'] = isset($row['stock']) ? (int) $row['stock'] : 0;
-        $products[] = $row;
+    try {
+        $stmt = $pdo->query('SELECT * FROM produits ORDER BY id DESC');
+        $products = [];
+
+        while ($row = $stmt->fetch()) {
+            $row['prix_achat'] = isset($row['prix_achat']) ? (float) $row['prix_achat'] : 0.0;
+            $row['prix_vente'] = isset($row['prix_vente']) ? (float) $row['prix_vente'] : 0.0;
+            $row['stock'] = isset($row['stock']) ? (int) $row['stock'] : 0;
+            $products[] = $row;
+        }
+    } catch (PDOException $exception) {
+        wp_send_json_error(
+            [
+                'message' => 'Lecture des produits impossible.',
+                'details' => inventory_debug_enabled() ? $exception->getMessage() : null,
+            ],
+            500
+        );
     }
 
-    inventory_json_response([
-        'success' => true,
-        'data' => $products,
-    ]);
+    wp_send_json_success($products);
 }
 
 /**
- * Remove a product from the inventory.
+ * Delete a product by ID.
  */
-function handle_delete_product(PDO $pdo): void
+function inventory_handle_delete_product(): void
 {
-    $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+    inventory_verify_request();
+    $pdo = inventory_require_pdo();
 
+    $id = isset($_POST['id']) ? (int) wp_unslash((string) $_POST['id']) : 0;
     if ($id <= 0) {
-        inventory_json_response([
-            'success' => false,
-            'message' => 'Identifiant invalide.',
-        ], 422);
+        wp_send_json_error(
+            [
+                'message' => 'Identifiant invalide.',
+            ],
+            422
+        );
     }
 
-    $stmt = $pdo->prepare('DELETE FROM produits WHERE id = :id');
-    $stmt->execute([':id' => $id]);
+    try {
+        $stmt = $pdo->prepare('DELETE FROM produits WHERE id = :id');
+        $stmt->execute([':id' => $id]);
+    } catch (PDOException $exception) {
+        wp_send_json_error(
+            [
+                'message' => 'Suppression impossible.',
+                'details' => inventory_debug_enabled() ? $exception->getMessage() : null,
+            ],
+            500
+        );
+    }
 
-    inventory_json_response([
-        'success' => true,
+    wp_send_json_success([
         'message' => 'Produit supprimé.',
     ]);
 }
 
 /**
- * Return aggregated statistics about the inventory.
+ * Send aggregated statistics.
  */
-function handle_get_stats(PDO $pdo): void
+function inventory_handle_get_stats(): void
 {
-    $stmt = $pdo->query('SELECT COALESCE(SUM(stock), 0) AS total_stock, COALESCE(SUM(prix_achat * stock), 0) AS total_achat, COALESCE(SUM(prix_vente * stock), 0) AS total_vente FROM produits');
-    $result = $stmt->fetch();
+    inventory_verify_request();
+    $pdo = inventory_require_pdo();
+
+    try {
+        $stmt = $pdo->query(
+            'SELECT COALESCE(SUM(stock), 0) AS total_stock,
+                    COALESCE(SUM(prix_achat * stock), 0) AS total_achat,
+                    COALESCE(SUM(prix_vente * stock), 0) AS total_vente
+             FROM produits'
+        );
+        $result = $stmt->fetch();
+    } catch (PDOException $exception) {
+        wp_send_json_error(
+            [
+                'message' => 'Lecture des statistiques impossible.',
+                'details' => inventory_debug_enabled() ? $exception->getMessage() : null,
+            ],
+            500
+        );
+    }
 
     $totalAchat = (float) ($result['total_achat'] ?? 0);
     $totalVente = (float) ($result['total_vente'] ?? 0);
 
-    inventory_json_response([
-        'success' => true,
-        'data' => [
-            'total_articles' => (int) ($result['total_stock'] ?? 0),
-            'valeur_achat' => $totalAchat,
-            'valeur_vente' => $totalVente,
-            'marge_totale' => $totalVente - $totalAchat,
-        ],
+    wp_send_json_success([
+        'total_articles' => (int) ($result['total_stock'] ?? 0),
+        'valeur_achat' => $totalAchat,
+        'valeur_vente' => $totalVente,
+        'marge_totale' => $totalVente - $totalAchat,
     ]);
 }
 
 /**
- * Update a single field for a specific product.
+ * Update a specific product field.
  */
-function handle_update_product(PDO $pdo): void
+function inventory_handle_update_product(): void
 {
-    $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
-    $field = $_POST['field'] ?? '';
-    $value = $_POST['value'] ?? null;
+    inventory_verify_request();
+    $pdo = inventory_require_pdo();
+
+    $id = isset($_POST['id']) ? (int) wp_unslash((string) $_POST['id']) : 0;
+    $field = isset($_POST['field']) ? sanitize_key((string) $_POST['field']) : '';
+    $value = isset($_POST['value']) ? wp_unslash((string) $_POST['value']) : null;
 
     $allowedFields = [
         'prix_achat' => 'float',
@@ -231,29 +298,47 @@ function handle_update_product(PDO $pdo): void
     ];
 
     if ($id <= 0 || !isset($allowedFields[$field])) {
-        inventory_json_response([
-            'success' => false,
-            'message' => 'Paramètres invalides.',
-        ], 422);
+        wp_send_json_error(
+            [
+                'message' => 'Paramètres invalides.',
+            ],
+            422
+        );
     }
 
     switch ($allowedFields[$field]) {
-        case 'float':
-            $value = (float) $value;
-            break;
         case 'int':
             $value = (int) $value;
+            if ($value < 0) {
+                $value = 0;
+            }
+            break;
+        case 'float':
+            $value = (float) str_replace(',', '.', (string) $value);
+            if ($value < 0) {
+                $value = 0.0;
+            }
+            $value = round($value, 2);
             break;
     }
 
-    $stmt = $pdo->prepare("UPDATE produits SET {$field} = :value WHERE id = :id");
-    $stmt->execute([
-        ':value' => $value,
-        ':id' => $id,
-    ]);
+    try {
+        $stmt = $pdo->prepare("UPDATE produits SET {$field} = :value WHERE id = :id");
+        $stmt->execute([
+            ':value' => $value,
+            ':id' => $id,
+        ]);
+    } catch (PDOException $exception) {
+        wp_send_json_error(
+            [
+                'message' => 'Mise à jour impossible.',
+                'details' => inventory_debug_enabled() ? $exception->getMessage() : null,
+            ],
+            500
+        );
+    }
 
-    inventory_json_response([
-        'success' => true,
+    wp_send_json_success([
         'message' => 'Produit mis à jour.',
     ]);
 }

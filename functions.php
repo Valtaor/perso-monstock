@@ -18,3 +18,5 @@ function theme_enqueue_styles()
 	wp_enqueue_style('child-style', get_stylesheet_directory_uri() . '/style.css', $child_style, $resources_version);
 }
 add_action('wp_enqueue_scripts', 'theme_enqueue_styles', 100);
+
+require_once get_stylesheet_directory() . '/includes/functions_inventaire.php';
