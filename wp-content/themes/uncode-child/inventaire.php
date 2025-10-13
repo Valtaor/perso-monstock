@@ -89,6 +89,19 @@ get_header();
                             </div>
                         </div>
 
+                        <div class="form-grid form-grid-terms">
+                            <div class="form-group">
+                                <label for="product-categories" class="form-label"><?php echo esc_html('Catégories'); ?></label>
+                                <select id="product-categories" name="categories[]" class="form-control multi-select" multiple data-placeholder="<?php echo esc_attr('Sélectionnez des catégories'); ?>"></select>
+                                <small class="form-hint"><?php echo esc_html('Affectez une ou plusieurs catégories colorées à votre pièce.'); ?></small>
+                            </div>
+                            <div class="form-group">
+                                <label for="product-tags" class="form-label"><?php echo esc_html('Tags'); ?></label>
+                                <select id="product-tags" name="tags[]" class="form-control multi-select" multiple data-placeholder="<?php echo esc_attr('Ajoutez des tags inspirants'); ?>"></select>
+                                <small class="form-hint"><?php echo esc_html('Mots-clés libres pour affiner vos recherches.'); ?></small>
+                            </div>
+                        </div>
+
                         <div class="form-section">
                             <label for="product-description" class="form-label"><?php echo esc_html('Description'); ?></label>
                             <textarea id="product-description" name="description" class="form-control" rows="4" placeholder="Détails, matériaux, époque..."></textarea>
@@ -129,6 +142,20 @@ get_header();
                         </article>
                     </div>
 
+                    <div class="inventory-filters">
+                        <div class="filter-group">
+                            <label for="filter-categories"><?php echo esc_html('Filtrer par catégories'); ?></label>
+                            <select id="filter-categories" class="form-control multi-select" multiple data-placeholder="<?php echo esc_attr('Toutes les catégories'); ?>"></select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filter-tags"><?php echo esc_html('Filtrer par tags'); ?></label>
+                            <select id="filter-tags" class="form-control multi-select" multiple data-placeholder="<?php echo esc_attr('Tous les tags'); ?>"></select>
+                        </div>
+                        <div class="filter-group">
+                            <button type="button" id="reset-filters" class="inventory-button ghost-button"><?php echo esc_html('Réinitialiser'); ?></button>
+                        </div>
+                    </div>
+
                     <div class="inventory-table-wrapper">
                         <table class="inventory-table">
                             <thead>
@@ -155,6 +182,32 @@ get_header();
                         </table>
                     </div>
                 </section>
+            </div>
+        </div>
+
+        <?php get_template_part('categories'); ?>
+
+        <div id="inventory-term-modal" class="inventory-modal" aria-hidden="true">
+            <div class="inventory-modal-overlay" role="presentation"></div>
+            <div class="inventory-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="inventory-term-modal-title">
+                <button type="button" class="modal-close" id="close-term-modal" aria-label="<?php echo esc_attr('Fermer la fenêtre'); ?>">&times;</button>
+                <h3 id="inventory-term-modal-title"><?php echo esc_html('Catégories & tags du produit'); ?></h3>
+                <p class="modal-subtitle"><?php echo esc_html('Ajustez les catégories colorées et les tags descriptifs pour affiner vos recherches.'); ?></p>
+                <form id="inventory-term-form">
+                    <input type="hidden" id="term-product-id" value="" />
+                    <div class="modal-field">
+                        <label for="modal-categories"><?php echo esc_html('Catégories associées'); ?></label>
+                        <select id="modal-categories" class="form-control multi-select" multiple></select>
+                    </div>
+                    <div class="modal-field">
+                        <label for="modal-tags"><?php echo esc_html('Tags associés'); ?></label>
+                        <select id="modal-tags" class="form-control multi-select" multiple></select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="inventory-button ghost-button" id="cancel-term-modal"><?php echo esc_html('Annuler'); ?></button>
+                        <button type="submit" class="inventory-button primary-button"><?php echo esc_html('Enregistrer'); ?></button>
+                    </div>
+                </form>
             </div>
         </div>
 

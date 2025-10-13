@@ -479,3 +479,390 @@ textarea.form-control {
         width: 100%;
     }
 }
+.form-grid-terms {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    margin-bottom: 18px;
+}
+
+.form-grid-terms .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.form-hint {
+    font-size: 0.85rem;
+    color: #8d8d8d;
+}
+
+.multi-select {
+    width: 100%;
+    min-height: 128px;
+    padding: 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(196, 123, 131, 0.25);
+    background: #ffffff;
+    color: #333;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.multi-select:focus {
+    outline: none;
+    border-color: #c47b83;
+    box-shadow: 0 0 0 3px rgba(196, 123, 131, 0.15);
+}
+
+.multi-select option {
+    padding: 6px 8px;
+    border-radius: 8px;
+}
+
+.multi-select option:checked {
+    background-color: #c47b83;
+    color: #fff;
+}
+
+.inventory-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+    margin: 28px 0 18px;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 220px;
+}
+
+.filter-group label {
+    font-weight: 600;
+    color: #c47b83;
+}
+
+.filter-group .inventory-button {
+    align-self: flex-start;
+}
+
+.item-categories,
+.item-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.category-badge {
+    --badge-color: #c47b83;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--badge-color);
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(196, 123, 131, 0.22);
+}
+
+.category-badge .category-emoji {
+    font-size: 0.9rem;
+}
+
+.tag-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(196, 123, 131, 0.16);
+    color: #c47b83;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.meta-placeholder {
+    color: #9b9b9b;
+    font-style: italic;
+    font-size: 0.78rem;
+}
+
+.inventory-taxonomy-manager {
+    margin-top: 42px;
+    display: grid;
+    gap: 24px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.taxonomy-card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 18px 42px rgba(196, 123, 131, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.taxonomy-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+}
+
+.taxonomy-header h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    color: #c47b83;
+}
+
+.taxonomy-header p {
+    margin: 6px 0 0;
+    color: #7a7a7a;
+    font-size: 0.92rem;
+}
+
+.taxonomy-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.taxonomy-fields {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.taxonomy-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.taxonomy-field input[type='color'] {
+    padding: 0;
+    height: 46px;
+    border-radius: 12px;
+    border: none;
+    background: #f8f6f5;
+    cursor: pointer;
+}
+
+.taxonomy-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.taxonomy-list-wrapper {
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.taxonomy-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.taxonomy-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    background: #fdfafa;
+    border-radius: 16px;
+    border: 1px solid rgba(196, 123, 131, 0.14);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.taxonomy-list li:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(196, 123, 131, 0.12);
+}
+
+.taxonomy-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.taxonomy-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--taxonomy-color, #c47b83);
+    box-shadow: 0 0 0 3px rgba(196, 123, 131, 0.15);
+}
+
+.taxonomy-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #333;
+    font-weight: 600;
+}
+
+.taxonomy-item-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-inline {
+    border: none;
+    background: transparent;
+    color: #c47b83;
+    font-weight: 600;
+    font-size: 0.88rem;
+    padding: 4px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.btn-inline:hover {
+    background: rgba(196, 123, 131, 0.12);
+}
+
+.btn-inline.danger {
+    color: #d26a73;
+}
+
+.taxonomy-empty {
+    padding: 16px;
+    text-align: center;
+    color: #8a8a8a;
+    background: #f8f6f5;
+    border-radius: 14px;
+}
+
+.inventory-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+}
+
+.inventory-modal.is-open {
+    display: flex;
+}
+
+.inventory-modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(42, 28, 33, 0.55);
+    backdrop-filter: blur(4px);
+}
+
+.inventory-modal-dialog {
+    position: relative;
+    background: #ffffff;
+    border-radius: 22px;
+    padding: 32px;
+    width: min(540px, calc(100% - 40px));
+    box-shadow: 0 24px 60px rgba(196, 123, 131, 0.18);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+}
+
+.inventory-modal-dialog h3 {
+    margin: 0;
+    font-size: 1.35rem;
+    color: #c47b83;
+}
+
+.modal-subtitle {
+    margin: -10px 0 10px;
+    color: #7c7c7c;
+    font-size: 0.95rem;
+}
+
+.modal-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.modal-close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    border: none;
+    background: transparent;
+    color: #c47b83;
+    font-size: 1.4rem;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+
+.modal-close:hover {
+    color: #a85f66;
+}
+
+body.inventory-modal-open {
+    overflow: hidden;
+}
+
+.inventory-toast.success {
+    background: #28a745;
+}
+
+.inventory-toast.warning {
+    background: #ffc107;
+    color: #333;
+}
+
+@media (max-width: 1180px) {
+    .inventory-taxonomy-manager {
+        grid-template-columns: 1fr;
+    }
+
+    .taxonomy-fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .form-grid-terms {
+        grid-template-columns: 1fr;
+    }
+
+    .inventory-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .taxonomy-fields {
+        grid-template-columns: 1fr;
+    }
+
+    .inventory-modal-dialog {
+        width: calc(100% - 32px);
+        padding: 26px;
+    }
+}
