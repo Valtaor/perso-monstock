@@ -2,6 +2,7 @@ jQuery(document).ready(function ($) {
     const ajaxUrl = inventorySettings.ajaxUrl;
     const uploadsUrl = inventorySettings.uploadsUrl;
     const nonce = inventorySettings.nonce;
+    const appName = inventorySettings.appName || 'Inventaire perso';
 
     const state = {
         categories: [],
@@ -10,6 +11,10 @@ jQuery(document).ready(function ($) {
         activeCategoryFilter: [],
         activeTagFilter: [],
     };
+
+    if (typeof document !== 'undefined' && typeof document.title === 'string' && document.title.indexOf(appName) === -1) {
+        document.title = `${appName} · ${document.title}`;
+    }
 
     const $body = $('body');
     const $tableBody = $('#inventory-table-body');
@@ -37,6 +42,10 @@ jQuery(document).ready(function ($) {
     const $advancedToggle = $('.advanced-toggle');
     const $quickAdvancedButton = $('#quick-open-advanced');
     const $scrollToInventory = $('#scroll-to-inventory');
+    const $navbarAddProduct = $('#navbar-add-product');
+    const $navbarOpenAnalytics = $('#navbar-open-analytics');
+    const $heroStats = $('#inventory-hero-stats');
+    const $quickAddCard = $('#quick-add-card');
     const $inventoryBoard = $('#inventory-board');
     const $taxonomyManager = $('#inventory-taxonomy-manager');
     const $termManagerButton = $('#open-term-manager');
@@ -187,7 +196,8 @@ jQuery(document).ready(function ($) {
         const toastId = `toast-${Date.now()}`;
         const $toast = $(`
             <div class="inventory-toast ${type}" id="${toastId}">
-                <span>${escapeHtml(message)}</span>
+                <span class="toast-title">${escapeHtml(appName)}</span>
+                <span class="toast-message">${escapeHtml(message)}</span>
             </div>
         `);
 
@@ -226,6 +236,21 @@ jQuery(document).ready(function ($) {
         $scrollToInventory.on('click', function (event) {
             event.preventDefault();
             scrollToSection($inventoryBoard, true);
+        });
+    }
+
+    if ($navbarAddProduct.length && $quickAddCard.length) {
+        $navbarAddProduct.on('click', function (event) {
+            event.preventDefault();
+            scrollToSection($quickAddCard, true);
+            $('#product-name').trigger('focus');
+        });
+    }
+
+    if ($navbarOpenAnalytics.length && $heroStats.length) {
+        $navbarOpenAnalytics.on('click', function (event) {
+            event.preventDefault();
+            scrollToSection($heroStats, true);
         });
     }
 

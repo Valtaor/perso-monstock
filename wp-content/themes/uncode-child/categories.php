@@ -15,7 +15,7 @@ if (!is_user_logged_in()) {
     <section class="inventory-card taxonomy-card taxonomy-categories">
         <div class="taxonomy-header">
             <div>
-                <h3><?php echo esc_html('Catégories colorées'); ?></h3>
+                <h3><?php echo esc_html('Catégories Inventaire perso'); ?></h3>
                 <p><?php echo esc_html('Structurez vos collections avec des catégories personnalisées.'); ?></p>
             </div>
             <button type="button" class="inventory-button ghost-button" id="reset-category-form"><?php echo esc_html('Nouvelle catégorie'); ?></button>
@@ -48,7 +48,7 @@ if (!is_user_logged_in()) {
     <section class="inventory-card taxonomy-card taxonomy-tags">
         <div class="taxonomy-header">
             <div>
-                <h3><?php echo esc_html('Tags librement'); ?></h3>
+                <h3><?php echo esc_html('Tags Inventaire perso'); ?></h3>
                 <p><?php echo esc_html('Ajoutez des mots-clés pour retrouver rapidement vos pièces.'); ?></p>
             </div>
             <button type="button" class="inventory-button ghost-button" id="reset-tag-form"><?php echo esc_html('Nouveau tag'); ?></button>

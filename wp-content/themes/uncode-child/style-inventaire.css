@@ -47,6 +47,94 @@
     margin: 0 auto;
 }
 
+.inventory-navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--inventory-white);
+    border-radius: 22px;
+    padding: 18px 28px;
+    box-shadow: var(--inventory-shadow);
+    margin-bottom: 36px;
+    position: sticky;
+    top: 20px;
+    z-index: 10;
+    backdrop-filter: blur(6px);
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.brand-logo {
+    width: 52px;
+    height: 52px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #c47b83, rgba(196, 123, 131, 0.75));
+    color: var(--inventory-white);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 22px rgba(196, 123, 131, 0.22);
+}
+
+.brand-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.brand-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--inventory-text);
+}
+
+.brand-subtitle {
+    font-size: 0.9rem;
+    color: rgba(51, 51, 51, 0.65);
+}
+
+.navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.navbar-actions .inventory-button {
+    white-space: nowrap;
+}
+
+.navbar-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-left: 16px;
+    border-left: 1px solid rgba(196, 123, 131, 0.24);
+}
+
+.user-initials {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(196, 123, 131, 0.18);
+    color: var(--inventory-rose);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.user-name {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: rgba(51, 51, 51, 0.9);
+}
+
 .inventory-access-denied {
     display: flex;
     align-items: center;
@@ -833,6 +921,21 @@ textarea.form-control {
     font-weight: 500;
 }
 
+.inventory-toast .toast-title {
+    display: block;
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+    opacity: 0.82;
+}
+
+.inventory-toast .toast-message {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
 .inventory-toast.error {
     background: #d6656f;
 }
@@ -874,6 +977,12 @@ textarea.form-control {
 }
 
 @media (max-width: 1080px) {
+    .inventory-navbar {
+        flex-wrap: wrap;
+        gap: 16px;
+        position: static;
+    }
+
     .inventory-hero {
         grid-template-columns: 1fr;
     }
@@ -894,6 +1003,28 @@ textarea.form-control {
 @media (max-width: 768px) {
     .inventory-page {
         padding: 40px 16px;
+    }
+
+    .inventory-navbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 18px;
+    }
+
+    .navbar-actions {
+        width: 100%;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 10px;
+    }
+
+    .navbar-actions .inventory-button {
+        flex: 1 1 48%;
+    }
+
+    .navbar-user {
+        padding-left: 0;
+        border-left: none;
     }
 
     .inventory-card {

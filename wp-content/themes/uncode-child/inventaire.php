@@ -1,6 +1,6 @@
 <?php
 /**
- * Template Name: Inventaire Bijoux
+ * Template Name: Inventaire Perso
  */
 
 if (!defined('ABSPATH')) {
@@ -29,6 +29,7 @@ wp_localize_script(
         'ajaxUrl'    => admin_url('admin-ajax.php'),
         'nonce'      => wp_create_nonce('inventory_nonce'),
         'uploadsUrl' => trailingslashit(get_stylesheet_directory_uri() . '/uploads'),
+        'appName'    => 'Inventaire perso',
     ]
 );
 
@@ -47,18 +48,38 @@ get_header();
             </div>
         </section>
     <?php else : ?>
+        <?php $inventory_current_user = wp_get_current_user(); ?>
         <div class="inventory-wrapper">
+            <nav class="inventory-navbar" aria-label="<?php echo esc_attr('Navigation Inventaire perso'); ?>">
+                <div class="navbar-brand">
+                    <span class="brand-logo" aria-hidden="true">IP</span>
+                    <div class="brand-copy">
+                        <span class="brand-title"><?php echo esc_html('Inventaire perso'); ?></span>
+                        <span class="brand-subtitle"><?php echo esc_html('Bijoux & objets vintage multicanaux'); ?></span>
+                    </div>
+                </div>
+                <div class="navbar-actions">
+                    <button type="button" class="inventory-button primary-button" id="navbar-add-product"><?php echo esc_html('Ajouter un article'); ?></button>
+                    <button type="button" class="inventory-button ghost-button" id="navbar-open-analytics"><?php echo esc_html('Ouvrir les KPI'); ?></button>
+                    <?php if ($inventory_current_user instanceof WP_User && $inventory_current_user->exists()) : ?>
+                        <div class="navbar-user" aria-label="<?php echo esc_attr('Utilisateur connecté'); ?>">
+                            <span class="user-initials" aria-hidden="true"><?php echo esc_html(strtoupper(mb_substr($inventory_current_user->display_name ?: $inventory_current_user->user_login, 0, 2))); ?></span>
+                            <span class="user-name"><?php echo esc_html($inventory_current_user->display_name ?: $inventory_current_user->user_login); ?></span>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </nav>
             <section class="inventory-hero" aria-labelledby="inventory-hero-title">
                 <div class="hero-intro">
-                    <span class="hero-kicker"><?php echo esc_html('Tableau de bord inventaire'); ?></span>
-                    <h1 id="inventory-hero-title" class="hero-title"><?php echo esc_html('Gérez vos bijoux en un clin d’œil'); ?></h1>
-                    <p class="hero-description"><?php echo esc_html('Ajoutez une pièce, visualisez vos stocks et pilotez votre collection sans quitter cet écran.'); ?></p>
+                    <span class="hero-kicker"><?php echo esc_html('Inventaire perso'); ?></span>
+                    <h1 id="inventory-hero-title" class="hero-title"><?php echo esc_html('Pilotez vos pièces et vos ventes en un lieu unique'); ?></h1>
+                    <p class="hero-description"><?php echo esc_html('Ajoutez un bijou, suivez vos stocks et surveillez vos marges pour Vinted, eBay ou Le Bon Coin en quelques clics.'); ?></p>
                     <div class="hero-actions">
                         <button type="button" class="inventory-button secondary-button" id="open-term-manager"><?php echo esc_html('Gérer les catégories & tags'); ?></button>
                         <button type="button" class="inventory-button ghost-button" id="scroll-to-inventory"><?php echo esc_html('Voir l\'inventaire'); ?></button>
                     </div>
                 </div>
-                <div class="hero-stats">
+                <div class="hero-stats" id="inventory-hero-stats">
                     <article class="stat-card">
                         <h3><?php echo esc_html('Articles en stock'); ?></h3>
                         <span id="stat-total-articles" class="stat-value">0</span>
@@ -82,9 +103,9 @@ get_header();
                 <section class="inventory-card quick-add-card" id="quick-add-card">
                     <header class="quick-add-header">
                         <div>
-                            <span class="quick-add-chip"><?php echo esc_html('Nouveau bijou'); ?></span>
-                            <h2><?php echo esc_html('Ajoutez une nouvelle pièce'); ?></h2>
-                            <p><?php echo esc_html('Capturez les détails essentiels en quelques champs et mettez votre création en lumière instantanément.'); ?></p>
+                            <span class="quick-add-chip"><?php echo esc_html('Inventaire perso • Ajout express'); ?></span>
+                            <h2><?php echo esc_html('Ajoutez une nouvelle pièce sans quitter l’écran'); ?></h2>
+                            <p><?php echo esc_html('Capturez les détails clés, assignez les catégories et publiez sur vos plateformes de vente en quelques secondes.'); ?></p>
                         </div>
                         <div class="quick-add-shortcuts">
                             <button type="button" class="inventory-button ghost-button" id="quick-open-advanced" aria-expanded="false" aria-controls="inventory-advanced-fields">
@@ -181,7 +202,7 @@ get_header();
 
                         <div class="form-actions">
                             <button type="submit" class="inventory-button primary-button"><?php echo esc_html('Ajouter à l\'inventaire'); ?></button>
-                            <span class="form-footnote"><?php echo esc_html('Moins d\'une minute pour publier un nouveau bijou.'); ?></span>
+                            <span class="form-footnote"><?php echo esc_html('Moins d\'une minute pour enrichir Inventaire perso.'); ?></span>
                         </div>
                     </form>
                 </section>
@@ -189,8 +210,8 @@ get_header();
                 <section class="inventory-card inventory-board" id="inventory-board">
                     <div class="board-header">
                         <div>
-                            <h2><?php echo esc_html('Inventaire en temps réel'); ?></h2>
-                            <p><?php echo esc_html('Filtrez, cherchez et exportez vos données sans quitter la page.'); ?></p>
+                            <h2><?php echo esc_html('Inventaire perso en temps réel'); ?></h2>
+                            <p><?php echo esc_html('Filtrez, cherchez, exportez et retrouvez vos annonces multicanales sans changer d’onglet.'); ?></p>
                         </div>
                         <div class="board-actions">
                             <input type="text" id="inventory-search" class="form-control search-input" placeholder="Rechercher un bijou..." aria-label="<?php echo esc_attr('Rechercher'); ?>" />
