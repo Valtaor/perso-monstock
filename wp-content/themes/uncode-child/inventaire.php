@@ -35,7 +35,7 @@ wp_localize_script(
 get_header();
 ?>
 
-<div class="inventory-page">
+<div class="inventory-page inventory-theme-neo">
     <?php if (!is_user_logged_in()) : ?>
         <section class="inventory-access-denied">
             <div class="inventory-card">
@@ -82,8 +82,9 @@ get_header();
                 <section class="inventory-card quick-add-card" id="quick-add-card">
                     <header class="quick-add-header">
                         <div>
+                            <span class="quick-add-chip"><?php echo esc_html('Nouveau bijou'); ?></span>
                             <h2><?php echo esc_html('Ajoutez une nouvelle pièce'); ?></h2>
-                            <p><?php echo esc_html('Un formulaire compact pour saisir immédiatement les informations clés.'); ?></p>
+                            <p><?php echo esc_html('Capturez les détails essentiels en quelques champs et mettez votre création en lumière instantanément.'); ?></p>
                         </div>
                         <div class="quick-add-shortcuts">
                             <button type="button" class="inventory-button ghost-button" id="quick-open-advanced" aria-expanded="false" aria-controls="inventory-advanced-fields">
@@ -105,6 +106,10 @@ get_header();
                                 </div>
                             </div>
                             <div class="quick-add-fields">
+                                <div class="quick-add-microcopy">
+                                    <strong><?php echo esc_html('Saisie express'); ?></strong>
+                                    <p><?php echo esc_html('Commencez par les informations indispensables, vous pourrez enrichir la fiche ensuite.'); ?></p>
+                                </div>
                                 <div class="form-grid form-grid-compact">
                                     <div class="form-group">
                                         <label for="product-name" class="form-label"><?php echo esc_html('Nom de l\'objet'); ?></label>
@@ -176,6 +181,7 @@ get_header();
 
                         <div class="form-actions">
                             <button type="submit" class="inventory-button primary-button"><?php echo esc_html('Ajouter à l\'inventaire'); ?></button>
+                            <span class="form-footnote"><?php echo esc_html('Moins d\'une minute pour publier un nouveau bijou.'); ?></span>
                         </div>
                     </form>
                 </section>
