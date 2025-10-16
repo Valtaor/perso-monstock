@@ -89,6 +89,46 @@ jQuery(document).ready(function ($) {
         `;
     }
 
+    function updateDerivedStats(products) {
+        if (!Array.isArray(products) || products.length === 0) {
+            $statLowStock.text(0);
+            $statOutOfStock.text(0);
+            $statAverageMargin.text(formatCurrency(0));
+            return;
+        }
+
+        let lowStock = 0;
+        let outOfStock = 0;
+        let totalMargin = 0;
+        let marginCount = 0;
+        let incompleteCount = 0;
+
+        products.forEach((product) => {
+            const stockValue = parseInt(product.stock, 10) || 0;
+            if (stockValue <= 0) {
+                outOfStock += 1;
+            } else if (stockValue <= 3) {
+                lowStock += 1;
+            }
+
+            const prixAchat = parseFloat(product.prix_achat) || 0;
+            const prixVente = parseFloat(product.prix_vente) || 0;
+            const marge = prixVente - prixAchat;
+            totalMargin += marge;
+            marginCount += 1;
+
+            if (Number(product.a_completer) === 1) {
+                incompleteCount += 1;
+            }
+        });
+
+        $statLowStock.text(lowStock);
+        $statOutOfStock.text(outOfStock);
+        const averageMargin = marginCount ? totalMargin / marginCount : 0;
+        $statAverageMargin.text(formatCurrency(averageMargin));
+        $statIncomplete.text(incompleteCount);
+    }
+
     function showEmptyState() {
         $tableBody.html(`
             <tr class="empty-state">
@@ -387,6 +427,42 @@ jQuery(document).ready(function ($) {
             }
         }).fail(() => {
             showToast(t('toastUpdateError', 'Mise à jour impossible.'), 'error');
+        });
+    });
+
+    $(document).on('click', '.toggle-incomplete', function () {
+        const $button = $(this);
+        const $row = $button.closest('tr');
+        const id = $row.data('id');
+        const isCurrentlyIncomplete = $button.data('incomplete') === 1 || $button.data('incomplete') === '1';
+        const nextValue = isCurrentlyIncomplete ? 0 : 1;
+
+        $.ajax({
+            url: ajaxUrl,
+            method: 'POST',
+            data: { action: 'update_product', id, field: 'a_completer', value: nextValue },
+            dataType: 'json',
+        }).done((response) => {
+            if (response.success) {
+                $button.data('incomplete', nextValue);
+                $row.attr('data-incomplete', nextValue ? '1' : '0');
+                const referenceEl = $row.find('.item-reference');
+                if (nextValue) {
+                    if (!referenceEl.find('.status-badge').length) {
+                        referenceEl.append(' <span class="status-badge badge-incomplete">À compléter</span>');
+                    }
+                    $button.text('☑️').attr('title', 'Marquer comme complet');
+                } else {
+                    referenceEl.find('.status-badge').remove();
+                    $button.text('⏳').attr('title', 'Marquer comme à compléter');
+                }
+                showToast('Statut mis à jour.');
+                loadProducts();
+            } else {
+                showToast(response.message || 'Mise à jour impossible.', 'error');
+            }
+        }).fail(() => {
+            showToast('Mise à jour impossible.', 'error');
         });
     });
 
