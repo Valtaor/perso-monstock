@@ -110,6 +110,8 @@ get_header();
                             </label>
                             <input type="file" id="product-image" name="image" accept="image/*" />
                         </div>
+                    </div>
+                </aside>
 
                         <div class="form-grid">
                             <div class="form-group">
@@ -128,13 +130,33 @@ get_header();
                                 <label for="product-prix-achat" class="form-label"><?php esc_html_e('Prix d\'achat (€)', 'uncode'); ?></label>
                                 <input type="number" step="0.01" min="0" id="product-prix-achat" name="prix_achat" class="form-control" placeholder="0.00" />
                             </div>
-                            <div class="form-group">
-                                <label for="product-prix-vente" class="form-label"><?php esc_html_e('Prix de vente (€)', 'uncode'); ?></label>
-                                <input type="number" step="0.01" min="0" id="product-prix-vente" name="prix_vente" class="form-control" placeholder="0.00" />
+                            <div class="inventory-actions">
+                                <button type="button" class="inventory-button ghost-button" data-range="30"><?php esc_html_e('30 derniers jours', 'uncode'); ?></button>
+                                <button type="button" class="inventory-button ghost-button" data-range="90"><?php esc_html_e('90 derniers jours', 'uncode'); ?></button>
                             </div>
                             <div class="form-group">
-                                <label for="product-stock" class="form-label"><?php esc_html_e('Stock disponible', 'uncode'); ?></label>
-                                <input type="number" min="0" id="product-stock" name="stock" class="form-control" placeholder="1" />
+                                <label for="product-date" class="form-label"><?php esc_html_e('Date d\'achat', 'uncode'); ?></label>
+                                <input type="date" id="product-date" name="date_achat" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label for="product-notes" class="form-label"><?php esc_html_e('Notes (facultatif)', 'uncode'); ?></label>
+                                <input type="text" id="product-notes" name="notes" class="form-control" placeholder="Matériaux, état..." />
+                            </div>
+                            <div class="form-group">
+                                <label for="product-date" class="form-label"><?php esc_html_e('Date d\'achat', 'uncode'); ?></label>
+                                <input type="date" id="product-date" name="date_achat" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label for="product-notes" class="form-label"><?php esc_html_e('Notes (facultatif)', 'uncode'); ?></label>
+                                <input type="text" id="product-notes" name="notes" class="form-control" placeholder="Matériaux, état..." />
+                            </div>
+                            <div class="form-group">
+                                <label for="product-date" class="form-label"><?php esc_html_e('Date d\'achat', 'uncode'); ?></label>
+                                <input type="date" id="product-date" name="date_achat" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label for="product-notes" class="form-label"><?php esc_html_e('Notes (facultatif)', 'uncode'); ?></label>
+                                <input type="text" id="product-notes" name="notes" class="form-control" placeholder="Matériaux, état..." />
                             </div>
                             <div class="form-group">
                                 <label for="product-date" class="form-label"><?php esc_html_e('Date d\'achat', 'uncode'); ?></label>
@@ -218,6 +240,32 @@ get_header();
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </section>
+
+                <section class="inventory-card inventory-alert-card">
+                    <header class="inventory-card-header">
+                        <div>
+                            <h2><?php esc_html_e('Statut des stocks', 'uncode'); ?></h2>
+                        </div>
+                    </header>
+                    <div class="inventory-alert-grid">
+                        <div class="inventory-alert">
+                            <span class="alert-label"><?php esc_html_e('Stock faible', 'uncode'); ?></span>
+                            <span id="stat-low-stock" class="alert-value">0</span>
+                        </div>
+                        <div class="inventory-alert">
+                            <span class="alert-label"><?php esc_html_e('En rupture', 'uncode'); ?></span>
+                            <span id="stat-out-of-stock" class="alert-value">0</span>
+                        </div>
+                        <div class="inventory-alert">
+                            <span class="alert-label"><?php esc_html_e('À compléter', 'uncode'); ?></span>
+                            <span id="stat-incomplete" class="alert-value">0</span>
+                        </div>
+                        <div class="inventory-alert">
+                            <span class="alert-label"><?php esc_html_e('Marge moyenne', 'uncode'); ?></span>
+                            <span id="stat-average-margin" class="alert-value">0,00 €</span>
+                        </div>
                     </div>
                 </section>
             </div>
