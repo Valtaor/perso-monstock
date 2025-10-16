@@ -8,6 +8,9 @@ jQuery(document).ready(function ($) {
     const $statsValeurVente = $('#stat-valeur-vente');
     const $statsMargeTotale = $('#stat-marge-totale');
     const $searchInput = $('#inventory-search');
+    const $statLowStock = $('#stat-low-stock');
+    const $statOutOfStock = $('#stat-out-of-stock');
+    const $statAverageMargin = $('#stat-average-margin');
     const $toastContainer = $('.inventory-toast-stack');
 
     function formatCurrency(value) {
@@ -42,6 +45,40 @@ jQuery(document).ready(function ($) {
         `;
     }
 
+    function updateDerivedStats(products) {
+        if (!Array.isArray(products) || products.length === 0) {
+            $statLowStock.text(0);
+            $statOutOfStock.text(0);
+            $statAverageMargin.text(formatCurrency(0));
+            return;
+        }
+
+        let lowStock = 0;
+        let outOfStock = 0;
+        let totalMargin = 0;
+        let marginCount = 0;
+
+        products.forEach((product) => {
+            const stockValue = parseInt(product.stock, 10) || 0;
+            if (stockValue <= 0) {
+                outOfStock += 1;
+            } else if (stockValue <= 3) {
+                lowStock += 1;
+            }
+
+            const prixAchat = parseFloat(product.prix_achat) || 0;
+            const prixVente = parseFloat(product.prix_vente) || 0;
+            const marge = prixVente - prixAchat;
+            totalMargin += marge;
+            marginCount += 1;
+        });
+
+        $statLowStock.text(lowStock);
+        $statOutOfStock.text(outOfStock);
+        const averageMargin = marginCount ? totalMargin / marginCount : 0;
+        $statAverageMargin.text(formatCurrency(averageMargin));
+    }
+
     function showEmptyState() {
         $tableBody.html(`
             <tr class="empty-state">
@@ -53,6 +90,7 @@ jQuery(document).ready(function ($) {
                 </td>
             </tr>
         `);
+        updateDerivedStats([]);
     }
 
     function showToast(message, type = 'success') {
@@ -89,6 +127,7 @@ jQuery(document).ready(function ($) {
 
                 const rows = response.data.map((product) => buildRow(product)).join('');
                 $tableBody.html(rows);
+                updateDerivedStats(response.data);
                 updateSearchFilter();
             }
         }).fail(() => {
@@ -186,6 +225,7 @@ jQuery(document).ready(function ($) {
                     showEmptyState();
                 }
                 loadStats();
+                loadProducts();
             } else {
                 showToast(response.message || 'Suppression impossible.', 'error');
             }
@@ -241,6 +281,7 @@ jQuery(document).ready(function ($) {
                 const marge = prixVente - prixAchat;
                 $cell.closest('tr').find('.cell-marge').text(formatCurrency(marge));
                 loadStats();
+                loadProducts();
             } else {
                 $cell.text(original);
                 showToast(response.message || 'Mise à jour impossible.', 'error');
