@@ -17,7 +17,7 @@ $pdo = null;
 
 try {
     $pdo = new PDO(
-        sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4', $host, $dbname),
+        sprintf('mysql:host=%s;dbname=%s;charset=utf8', $host, $dbname),
         $user,
         $pass,
         [
@@ -25,8 +25,10 @@ try {
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]
     );
-} catch (PDOException $e) {
-    // Intentionally swallow the exception; downstream code will detect the
-    // missing PDO instance and emit a JSON error response for the UI.
+} catch (PDOException $exception) {
     $pdo = null;
+
+    if (function_exists('error_log')) {
+        error_log('[Inventory] Connexion base impossible : ' . $exception->getMessage());
+    }
 }

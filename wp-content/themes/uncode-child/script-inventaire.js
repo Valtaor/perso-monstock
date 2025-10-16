@@ -430,42 +430,6 @@ jQuery(document).ready(function ($) {
         });
     });
 
-    $(document).on('click', '.toggle-incomplete', function () {
-        const $button = $(this);
-        const $row = $button.closest('tr');
-        const id = $row.data('id');
-        const isCurrentlyIncomplete = $button.data('incomplete') === 1 || $button.data('incomplete') === '1';
-        const nextValue = isCurrentlyIncomplete ? 0 : 1;
-
-        $.ajax({
-            url: ajaxUrl,
-            method: 'POST',
-            data: { action: 'update_product', id, field: 'a_completer', value: nextValue },
-            dataType: 'json',
-        }).done((response) => {
-            if (response.success) {
-                $button.data('incomplete', nextValue);
-                $row.attr('data-incomplete', nextValue ? '1' : '0');
-                const referenceEl = $row.find('.item-reference');
-                if (nextValue) {
-                    if (!referenceEl.find('.status-badge').length) {
-                        referenceEl.append(' <span class="status-badge badge-incomplete">À compléter</span>');
-                    }
-                    $button.text('☑️').attr('title', 'Marquer comme complet');
-                } else {
-                    referenceEl.find('.status-badge').remove();
-                    $button.text('⏳').attr('title', 'Marquer comme à compléter');
-                }
-                showToast('Statut mis à jour.');
-                loadProducts();
-            } else {
-                showToast(response.message || 'Mise à jour impossible.', 'error');
-            }
-        }).fail(() => {
-            showToast('Mise à jour impossible.', 'error');
-        });
-    });
-
     $searchInput.on('keyup', updateSearchFilter);
 
     $('#export-csv').on('click', function () {

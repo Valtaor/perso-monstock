@@ -158,6 +158,14 @@ get_header();
                                 <label for="product-notes" class="form-label"><?php esc_html_e('Notes (facultatif)', 'uncode'); ?></label>
                                 <input type="text" id="product-notes" name="notes" class="form-control" placeholder="Matériaux, état..." />
                             </div>
+                            <div class="form-group">
+                                <label for="product-date" class="form-label"><?php esc_html_e('Date d\'achat', 'uncode'); ?></label>
+                                <input type="date" id="product-date" name="date_achat" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label for="product-notes" class="form-label"><?php esc_html_e('Notes (facultatif)', 'uncode'); ?></label>
+                                <input type="text" id="product-notes" name="notes" class="form-control" placeholder="Matériaux, état..." />
+                            </div>
                         </div>
 
                         <section class="form-section inventory-follow-up" aria-labelledby="follow-up-title">
