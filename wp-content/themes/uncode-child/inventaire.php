@@ -7,18 +7,20 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+$assetVersion = '2.0.0';
+
 wp_enqueue_style(
     'inventory-style',
     get_stylesheet_directory_uri() . '/style-inventaire.css',
     [],
-    '1.0.0'
+    $assetVersion
 );
 
 wp_enqueue_script(
     'inventory-script',
     get_stylesheet_directory_uri() . '/script-inventaire.js',
     ['jquery'],
-    '1.0.0',
+    $assetVersion,
     true
 );
 
@@ -28,38 +30,70 @@ wp_localize_script(
     [
         'ajaxUrl' => get_stylesheet_directory_uri() . '/includes/functions_inventaire.php',
         'uploadsUrl' => get_stylesheet_directory_uri() . '/uploads/',
+        'i18n' => [
+            'emptyInventory' => __('Votre inventaire est vide.', 'uncode'),
+            'emptySearch' => __('Aucun bijou dans l\'inventaire pour le moment.', 'uncode'),
+            'toastAddSuccess' => __('Produit ajouté avec succès.', 'uncode'),
+            'toastAddError' => __('Erreur lors de l\'ajout du produit.', 'uncode'),
+            'toastDeleteSuccess' => __('Produit supprimé.', 'uncode'),
+            'toastDeleteError' => __('Suppression impossible.', 'uncode'),
+            'toastUpdateSuccess' => __('Valeur mise à jour.', 'uncode'),
+            'toastUpdateError' => __('Mise à jour impossible.', 'uncode'),
+            'toggleIncomplete' => __('Marquer comme à compléter', 'uncode'),
+            'toggleComplete' => __('Marquer comme complet', 'uncode'),
+            'deleteConfirm' => __('Supprimer cet article ?', 'uncode'),
+        ],
     ]
 );
 
 get_header();
 ?>
 
-<div class="inventory-page">
+<div class="inventory-page portrait-layout">
     <?php if (!is_user_logged_in()) : ?>
         <section class="inventory-access-denied">
             <div class="inventory-card">
                 <h2><?php esc_html_e('Accès restreint', 'uncode'); ?></h2>
                 <p><?php esc_html_e('Vous devez être connecté pour consulter le tableau de bord inventaire.', 'uncode'); ?></p>
-                <a class="inventory-button" href="<?php echo esc_url(wp_login_url(get_permalink())); ?>">
+                <a class="inventory-button primary-button" href="<?php echo esc_url(wp_login_url(get_permalink())); ?>">
                     <?php esc_html_e('Se connecter', 'uncode'); ?>
                 </a>
             </div>
         </section>
     <?php else : ?>
-        <header class="inventory-hero">
-            <div class="inventory-hero-content">
-                <h1><?php esc_html_e('Gestion des stocks de Bijoux', 'uncode'); ?></h1>
-                <p><?php esc_html_e('Mon assistant intelligent pour la gestion de mes bijoux.', 'uncode'); ?></p>
-            </div>
-        </header>
+        <main class="inventory-dashboard" role="main">
+            <header class="inventory-hero">
+                <div class="inventory-hero-body">
+                    <p class="inventory-hero-kicker"><?php esc_html_e('Tableau de bord', 'uncode'); ?></p>
+                    <h1 class="inventory-hero-title"><?php esc_html_e('Inventaire bijoux', 'uncode'); ?></h1>
+                    <p class="inventory-hero-subtitle"><?php esc_html_e('Ajoutez vos pièces, surveillez les stocks faibles et gardez un œil sur la marge depuis un tableau de bord vertical lisible.', 'uncode'); ?></p>
+                </div>
+                <section class="inventory-card inventory-stats-card" id="inventory-overview" aria-labelledby="inventory-overview-title">
+                    <h2 id="inventory-overview-title" class="sr-only"><?php esc_html_e('Statistiques globales', 'uncode'); ?></h2>
+                    <div class="stat-grid">
+                        <article class="stat-item">
+                            <span class="stat-label"><?php esc_html_e('Articles', 'uncode'); ?></span>
+                            <span id="stat-total-articles" class="stat-value">0</span>
+                        </article>
+                        <article class="stat-item">
+                            <span class="stat-label"><?php esc_html_e('Valeur de vente', 'uncode'); ?></span>
+                            <span id="stat-valeur-vente" class="stat-value">0,00 €</span>
+                        </article>
+                        <article class="stat-item">
+                            <span class="stat-label"><?php esc_html_e('Marge totale', 'uncode'); ?></span>
+                            <span id="stat-marge-totale" class="stat-value">0,00 €</span>
+                        </article>
+                        <span id="stat-valeur-achat" class="sr-only">0,00 €</span>
+                    </div>
+                </section>
+            </header>
 
-        <div class="inventory-dashboard">
-            <div class="inventory-column inventory-form-column">
-                <section id="inventory-form-card" class="inventory-card inventory-form-card">
+            <div class="inventory-main-grid">
+                <section id="inventory-form-card" class="inventory-card inventory-form-card" aria-labelledby="inventory-form-title">
                     <header class="inventory-card-header">
                         <div>
-                            <h2><?php esc_html_e('Ajouter un objet', 'uncode'); ?></h2>
-                            <p><?php esc_html_e('Glissez-déposez une image ou cliquez pour parcourir', 'uncode'); ?></p>
+                            <h2 id="inventory-form-title"><?php esc_html_e('Ajouter un bijou', 'uncode'); ?></h2>
+                            <p><?php esc_html_e('Glissez une photo et renseignez les informations essentielles.', 'uncode'); ?></p>
                         </div>
                     </header>
 
@@ -67,10 +101,10 @@ get_header();
                         <div class="inventory-upload">
                             <label for="product-image" class="upload-drop-area">
                                 <span class="upload-icon" aria-hidden="true">📷</span>
-                                <span class="upload-text"><?php esc_html_e('Déposez une photo ici', 'uncode'); ?></span>
-                                <span class="upload-subtext"><?php esc_html_e('ou cliquez pour parcourir', 'uncode'); ?></span>
+                                <span class="upload-text"><?php esc_html_e('Déposez une photo', 'uncode'); ?></span>
+                                <span class="upload-subtext"><?php esc_html_e('ou cliquez pour parcourir vos fichiers', 'uncode'); ?></span>
                                 <div class="image-preview-wrapper">
-                                    <img id="image-preview" class="image-preview is-empty" src="" alt="<?php esc_attr_e('Aperçu de l\'image', 'uncode'); ?>" />
+                                    <img id="image-preview" class="image-preview is-empty" src="" alt="<?php esc_attr_e('Aperçu de l\'image sélectionnée', 'uncode'); ?>" />
                                     <span class="image-placeholder"><?php esc_html_e('Aperçu disponible après sélection', 'uncode'); ?></span>
                                 </div>
                             </label>
@@ -89,7 +123,7 @@ get_header();
                                 <input type="text" id="product-reference" name="reference" class="form-control" placeholder="REF-001" required />
                             </div>
                             <div class="form-group">
-                                <label for="product-location" class="form-label"><?php esc_html_e('Casier / Emplacement', 'uncode'); ?></label>
+                                <label for="product-location" class="form-label"><?php esc_html_e('Casier / emplacement', 'uncode'); ?></label>
                                 <input type="text" id="product-location" name="emplacement" class="form-control" placeholder="Ex. A1, B1" />
                             </div>
                             <div class="form-group">
@@ -116,12 +150,21 @@ get_header();
                                 <label for="product-notes" class="form-label"><?php esc_html_e('Notes (facultatif)', 'uncode'); ?></label>
                                 <input type="text" id="product-notes" name="notes" class="form-control" placeholder="Matériaux, état..." />
                             </div>
+                            <div class="form-group">
+                                <label for="product-date" class="form-label"><?php esc_html_e('Date d\'achat', 'uncode'); ?></label>
+                                <input type="date" id="product-date" name="date_achat" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label for="product-notes" class="form-label"><?php esc_html_e('Notes (facultatif)', 'uncode'); ?></label>
+                                <input type="text" id="product-notes" name="notes" class="form-control" placeholder="Matériaux, état..." />
+                            </div>
                         </div>
+
                         <section class="form-section inventory-follow-up" aria-labelledby="follow-up-title">
                             <div class="follow-up-header">
                                 <div>
                                     <h3 id="follow-up-title"><?php esc_html_e('À renseigner plus tard', 'uncode'); ?></h3>
-                                    <p><?php esc_html_e('Activez cette option pour vous rappeler qu\'il manque des informations à compléter sur cet objet.', 'uncode'); ?></p>
+                                    <p><?php esc_html_e('Marquez la fiche pour être alerté qu\'il manque des informations.', 'uncode'); ?></p>
                                 </div>
                                 <label class="inventory-switch">
                                     <input type="checkbox" id="product-incomplete" name="a_completer" value="1" />
@@ -130,76 +173,38 @@ get_header();
                                 </label>
                             </div>
                             <ul class="follow-up-hints">
-                                <li><?php esc_html_e('Les objets marqués affichent un badge « À compléter » dans votre inventaire.', 'uncode'); ?></li>
-                                <li><?php esc_html_e('Ajoutez un rappel pour les documents ou informations manquants.', 'uncode'); ?></li>
+                                <li><?php esc_html_e('Un badge « À compléter » apparaît dans la liste.', 'uncode'); ?></li>
+                                <li><?php esc_html_e('Ajoutez des précisions à retrouver plus tard.', 'uncode'); ?></li>
                             </ul>
-                            <label for="product-description" class="form-label">
-                                <?php esc_html_e('Informations à ajouter plus tard (facultatif)', 'uncode'); ?>
-                            </label>
-                            <textarea id="product-description" name="description" class="form-control" rows="3" placeholder="Certificat d'authenticité, histoire de la pièce..."></textarea>
+                            <label for="product-description" class="form-label"><?php esc_html_e('Informations manquantes', 'uncode'); ?></label>
+                            <textarea id="product-description" name="description" class="form-control" rows="3" placeholder="Certificat d'authenticité, expertise, documents..."></textarea>
                         </section>
 
-                        <button type="submit" class="inventory-button primary-button"><?php esc_html_e('Ajouter à l\'inventaire', 'uncode'); ?></button>
-                </form>
-            </section>
-        </div>
-
-        <div class="inventory-column inventory-data-column">
-                <section class="inventory-card inventory-stats-card" id="inventory-overview">
-                    <header class="inventory-card-header">
-                        <div>
-                            <h2><?php esc_html_e('Statistiques', 'uncode'); ?></h2>
+                        <div class="form-actions">
+                            <button type="submit" class="inventory-button primary-button"><?php esc_html_e('Ajouter à l\'inventaire', 'uncode'); ?></button>
                         </div>
-                    </header>
-                    <div class="stat-grid">
-                        <article class="stat-item">
-                            <span class="stat-label"><?php esc_html_e('Stock', 'uncode'); ?></span>
-                            <span id="stat-total-articles" class="stat-value">0</span>
-                        </article>
-                        <article class="stat-item">
-                            <span class="stat-label"><?php esc_html_e('C.A.', 'uncode'); ?></span>
-                            <span id="stat-valeur-vente" class="stat-value">0,00 €</span>
-                        </article>
-                        <article class="stat-item">
-                            <span class="stat-label"><?php esc_html_e('Marge', 'uncode'); ?></span>
-                            <span id="stat-marge-totale" class="stat-value">0,00 €</span>
-                        </article>
-                        <span id="stat-valeur-achat" class="sr-only">0,00 €</span>
-                    </div>
+                    </form>
                 </section>
 
-                <section class="inventory-card inventory-performance-card">
+                <section class="inventory-card inventory-table-card" id="inventory-table" aria-labelledby="inventory-table-title">
                     <header class="inventory-card-header">
                         <div>
-                            <h2><?php esc_html_e('Performances plateformes', 'uncode'); ?></h2>
-                            <p><?php esc_html_e('Ajoutez des plateformes pour suivre les performances.', 'uncode'); ?></p>
-                        </div>
-                    </header>
-                    <div class="performance-placeholder">
-                        <p><?php esc_html_e('Connectez vos canaux de vente pour comparer les résultats.', 'uncode'); ?></p>
-                        <button type="button" class="inventory-button ghost-button"><?php esc_html_e('Ajouter une plateforme', 'uncode'); ?></button>
-                    </div>
-                </section>
-
-                <section class="inventory-card inventory-table-card" id="inventory-table">
-                    <header class="inventory-card-header">
-                        <div>
-                            <h2><?php esc_html_e('Inventaire', 'uncode'); ?></h2>
-                            <p><?php esc_html_e('Recherchez, filtrez et exportez votre stock en un clin d\'œil.', 'uncode'); ?></p>
+                            <h2 id="inventory-table-title"><?php esc_html_e('Inventaire détaillé', 'uncode'); ?></h2>
+                            <p><?php esc_html_e('Recherchez, exportez et mettez à jour vos pièces sans quitter la vue portrait.', 'uncode'); ?></p>
                         </div>
                         <button type="button" id="export-csv" class="inventory-button ghost-button"><?php esc_html_e('Exporter CSV', 'uncode'); ?></button>
                     </header>
 
                     <div class="inventory-table-tools">
-                        <div class="inventory-tabs" role="tablist">
-                            <button type="button" class="inventory-tab is-active" role="tab"><?php esc_html_e('Tout', 'uncode'); ?></button>
-                            <button type="button" class="inventory-tab" role="tab"><?php esc_html_e('Stock', 'uncode'); ?></button>
-                            <button type="button" class="inventory-tab" role="tab"><?php esc_html_e('Tous les casiers', 'uncode'); ?></button>
-                            <button type="button" class="inventory-tab" role="tab"><?php esc_html_e('Tous les statuts', 'uncode'); ?></button>
-                        </div>
                         <div class="inventory-search">
                             <span class="search-icon" aria-hidden="true">🔍</span>
-                            <input type="text" id="inventory-search" class="form-control search-input" placeholder="<?php esc_attr_e('Rechercher...', 'uncode'); ?>" aria-label="<?php esc_attr_e('Rechercher', 'uncode'); ?>" />
+                            <input type="text" id="inventory-search" class="form-control search-input" placeholder="<?php esc_attr_e('Rechercher un bijou...', 'uncode'); ?>" aria-label="<?php esc_attr_e('Rechercher', 'uncode'); ?>" />
+                        </div>
+                        <div class="inventory-legend">
+                            <span class="legend-item">
+                                <span class="status-badge badge-incomplete"><?php esc_html_e('À compléter', 'uncode'); ?></span>
+                                <span><?php esc_html_e('Fiche marquée incomplète', 'uncode'); ?></span>
+                            </span>
                         </div>
                     </div>
 
@@ -207,13 +212,13 @@ get_header();
                         <table class="inventory-table">
                             <thead>
                                 <tr>
-                                    <th><?php esc_html_e('Image', 'uncode'); ?></th>
-                                    <th><?php esc_html_e('Objet', 'uncode'); ?></th>
-                                    <th><?php esc_html_e('Prix achat (€)', 'uncode'); ?></th>
-                                    <th><?php esc_html_e('Prix vente (€)', 'uncode'); ?></th>
-                                    <th><?php esc_html_e('Stock', 'uncode'); ?></th>
-                                    <th><?php esc_html_e('Marge', 'uncode'); ?></th>
-                                    <th><?php esc_html_e('Actions', 'uncode'); ?></th>
+                                    <th scope="col"><?php esc_html_e('Image', 'uncode'); ?></th>
+                                    <th scope="col"><?php esc_html_e('Objet', 'uncode'); ?></th>
+                                    <th scope="col"><?php esc_html_e('Prix achat (€)', 'uncode'); ?></th>
+                                    <th scope="col"><?php esc_html_e('Prix vente (€)', 'uncode'); ?></th>
+                                    <th scope="col"><?php esc_html_e('Stock', 'uncode'); ?></th>
+                                    <th scope="col"><?php esc_html_e('Marge', 'uncode'); ?></th>
+                                    <th scope="col"><?php esc_html_e('Actions', 'uncode'); ?></th>
                                 </tr>
                             </thead>
                             <tbody id="inventory-table-body">
@@ -256,9 +261,36 @@ get_header();
                     </div>
                 </section>
             </div>
-        </div>
 
-        <div class="inventory-toast-stack" aria-live="polite" aria-atomic="true"></div>
+            <section class="inventory-card inventory-alert-card" aria-labelledby="inventory-alert-title">
+                <header class="inventory-card-header">
+                    <div>
+                        <h2 id="inventory-alert-title"><?php esc_html_e('Points de vigilance', 'uncode'); ?></h2>
+                        <p><?php esc_html_e('Gardez le contrôle sur les stocks critiques et les fiches à compléter.', 'uncode'); ?></p>
+                    </div>
+                </header>
+                <div class="inventory-alert-grid">
+                    <div class="inventory-alert">
+                        <span class="alert-label"><?php esc_html_e('Stock faible', 'uncode'); ?></span>
+                        <span id="stat-low-stock" class="alert-value">0</span>
+                    </div>
+                    <div class="inventory-alert">
+                        <span class="alert-label"><?php esc_html_e('En rupture', 'uncode'); ?></span>
+                        <span id="stat-out-of-stock" class="alert-value">0</span>
+                    </div>
+                    <div class="inventory-alert">
+                        <span class="alert-label"><?php esc_html_e('Fiches à compléter', 'uncode'); ?></span>
+                        <span id="stat-incomplete" class="alert-value">0</span>
+                    </div>
+                    <div class="inventory-alert">
+                        <span class="alert-label"><?php esc_html_e('Marge moyenne', 'uncode'); ?></span>
+                        <span id="stat-average-margin" class="alert-value">0,00 €</span>
+                    </div>
+                </div>
+            </section>
+
+            <div class="inventory-toast-stack" aria-live="polite" aria-atomic="true"></div>
+        </main>
     <?php endif; ?>
 </div>
 

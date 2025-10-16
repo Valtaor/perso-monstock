@@ -1,7 +1,10 @@
 jQuery(document).ready(function ($) {
-    const ajaxUrl = inventorySettings.ajaxUrl;
-    const uploadsUrl = inventorySettings.uploadsUrl;
+    const settings = window.inventorySettings || {};
+    const ajaxUrl = settings.ajaxUrl || '';
+    const uploadsUrl = settings.uploadsUrl || '';
+    const i18n = settings.i18n || {};
 
+    const $form = $('#inventory-form');
     const $tableBody = $('#inventory-table-body');
     const $statsTotalArticles = $('#stat-total-articles');
     const $statsValeurAchat = $('#stat-valeur-achat');
@@ -16,6 +19,13 @@ jQuery(document).ready(function ($) {
     const $followUpSection = $('.inventory-follow-up');
     const $incompleteToggle = $('#product-incomplete');
 
+    function t(key, fallback) {
+        if (Object.prototype.hasOwnProperty.call(i18n, key)) {
+            return i18n[key];
+        }
+        return fallback || key;
+    }
+
     function formatCurrency(value) {
         return Number(value || 0).toLocaleString('fr-FR', {
             style: 'currency',
@@ -24,17 +34,41 @@ jQuery(document).ready(function ($) {
         });
     }
 
+    function showToast(message, type = 'success') {
+        if (!message) {
+            return;
+        }
+        const toastId = `toast-${Date.now()}`;
+        const $toast = $(`
+            <div class="inventory-toast ${type}" id="${toastId}">
+                <span>${message}</span>
+            </div>
+        `);
+
+        $toastContainer.append($toast);
+        requestAnimationFrame(() => {
+            $toast.addClass('visible');
+        });
+
+        setTimeout(() => {
+            $toast.removeClass('visible');
+            setTimeout(() => $toast.remove(), 300);
+        }, 3200);
+    }
+
     function buildRow(product) {
         const imageCell = product.image
-            ? `<img src="${uploadsUrl}${product.image}" alt="${product.nom}" class="inventory-thumb">`
+            ? `<img src="${uploadsUrl}${product.image}" alt="${product.nom || ''}" class="inventory-thumb">`
             : '<div class="inventory-thumb placeholder">✨</div>';
         const isIncomplete = Number(product.a_completer) === 1;
-        const marge = (Number(product.prix_vente) - Number(product.prix_achat)).toFixed(2);
         const statusBadge = isIncomplete
             ? '<span class="status-badge badge-incomplete">À compléter</span>'
             : '';
-        const toggleTitle = isIncomplete ? 'Marquer comme complet' : 'Marquer comme à compléter';
+        const toggleTitle = isIncomplete ? t('toggleComplete', 'Marquer comme complet') : t('toggleIncomplete', 'Marquer comme à compléter');
         const toggleIcon = isIncomplete ? '☑️' : '⏳';
+        const prixAchat = Number(product.prix_achat || 0);
+        const prixVente = Number(product.prix_vente || 0);
+        const marge = prixVente - prixAchat;
 
         return `
             <tr data-id="${product.id}" data-incomplete="${isIncomplete ? '1' : '0'}">
@@ -43,9 +77,9 @@ jQuery(document).ready(function ($) {
                     <div class="item-name">${product.nom || ''}</div>
                     <div class="item-reference">${product.reference || ''} ${statusBadge}</div>
                 </td>
-                <td class="cell-price inventory-editable" contenteditable="true" data-field="prix_achat">${Number(product.prix_achat).toFixed(2)}</td>
-                <td class="cell-price inventory-editable" contenteditable="true" data-field="prix_vente">${Number(product.prix_vente).toFixed(2)}</td>
-                <td class="cell-stock inventory-editable" contenteditable="true" data-field="stock">${parseInt(product.stock, 10)}</td>
+                <td class="cell-price inventory-editable" contenteditable="true" data-field="prix_achat">${prixAchat.toFixed(2)}</td>
+                <td class="cell-price inventory-editable" contenteditable="true" data-field="prix_vente">${prixVente.toFixed(2)}</td>
+                <td class="cell-stock inventory-editable" contenteditable="true" data-field="stock">${parseInt(product.stock, 10) || 0}</td>
                 <td class="cell-marge">${formatCurrency(marge)}</td>
                 <td class="cell-actions">
                     <button class="btn-icon toggle-incomplete" data-incomplete="${isIncomplete ? '1' : '0'}" title="${toggleTitle}">${toggleIcon}</button>
@@ -101,32 +135,91 @@ jQuery(document).ready(function ($) {
                 <td colspan="7">
                     <div class="empty-wrapper">
                         <span class="empty-icon">💎</span>
-                        <p>Aucun bijou dans l'inventaire pour le moment.</p>
+                        <p>${t('emptySearch', "Aucun bijou dans l'inventaire pour le moment.")}</p>
                     </div>
                 </td>
             </tr>
         `);
         updateDerivedStats([]);
-        $statIncomplete.text(0);
     }
 
-    function showToast(message, type = 'success') {
-        const toastId = `toast-${Date.now()}`;
-        const $toast = $(`
-            <div class="inventory-toast ${type}" id="${toastId}">
-                <span>${message}</span>
-            </div>
-        `);
+    function updateDerivedStats(products) {
+        if (!Array.isArray(products) || products.length === 0) {
+            $statLowStock.text(0);
+            $statOutOfStock.text(0);
+            $statAverageMargin.text(formatCurrency(0));
+            $statIncomplete.text(0);
+            return;
+        }
 
-        $toastContainer.append($toast);
-        requestAnimationFrame(() => {
-            $toast.addClass('visible');
+        let lowStock = 0;
+        let outOfStock = 0;
+        let totalMargin = 0;
+        let marginCount = 0;
+        let incompleteCount = 0;
+
+        products.forEach((product) => {
+            const stockValue = parseInt(product.stock, 10) || 0;
+            if (stockValue <= 0) {
+                outOfStock += 1;
+            } else if (stockValue <= 3) {
+                lowStock += 1;
+            }
+
+            const prixAchat = parseFloat(product.prix_achat) || 0;
+            const prixVente = parseFloat(product.prix_vente) || 0;
+            totalMargin += prixVente - prixAchat;
+            marginCount += 1;
+
+            if (Number(product.a_completer) === 1) {
+                incompleteCount += 1;
+            }
         });
 
-        setTimeout(() => {
-            $toast.removeClass('visible');
-            setTimeout(() => $toast.remove(), 300);
-        }, 3000);
+        $statLowStock.text(lowStock);
+        $statOutOfStock.text(outOfStock);
+        $statAverageMargin.text(formatCurrency(marginCount ? totalMargin / marginCount : 0));
+        $statIncomplete.text(incompleteCount);
+    }
+
+    function updateSearchFilter() {
+        const query = ($searchInput.val() || '').toLowerCase();
+        let visibleRows = 0;
+        $tableBody.find('tr').each(function () {
+            const $row = $(this);
+            if ($row.hasClass('empty-state')) {
+                return;
+            }
+            const text = $row.text().toLowerCase();
+            const isVisible = text.includes(query);
+            $row.toggle(isVisible);
+            if (isVisible) {
+                visibleRows += 1;
+            }
+        });
+
+        if (visibleRows === 0) {
+            showEmptyState();
+        }
+    }
+
+    function refreshTable(products) {
+        if (!products || products.length === 0) {
+            showEmptyState();
+            return;
+        }
+        const rows = products.map((product) => buildRow(product)).join('');
+        $tableBody.html(rows);
+        updateDerivedStats(products);
+        updateSearchFilter();
+    }
+
+    function handleAjaxError(jqXHR) {
+        let message = t('toastUpdateError', 'Une erreur est survenue.');
+        if (jqXHR && jqXHR.responseJSON && jqXHR.responseJSON.message) {
+            message = jqXHR.responseJSON.message;
+        }
+        showToast(message, 'error');
     }
 
     function loadProducts() {
@@ -137,19 +230,11 @@ jQuery(document).ready(function ($) {
             dataType: 'json',
         }).done((response) => {
             if (response.success) {
-                if (!response.data || response.data.length === 0) {
-                    showEmptyState();
-                    return;
-                }
-
-                const rows = response.data.map((product) => buildRow(product)).join('');
-                $tableBody.html(rows);
-                updateDerivedStats(response.data);
-                updateSearchFilter();
+                refreshTable(response.data || []);
+            } else {
+                showEmptyState();
             }
-        }).fail(() => {
-            showToast('Impossible de charger les produits.', 'error');
-        });
+        }).fail(handleAjaxError);
     }
 
     function loadStats() {
@@ -165,22 +250,30 @@ jQuery(document).ready(function ($) {
                 $statsValeurVente.text(formatCurrency(response.data.valeur_vente));
                 $statsMargeTotale.text(formatCurrency(response.data.marge_totale));
             }
+        }).fail(handleAjaxError);
+    }
+
+    if ($incompleteToggle.length) {
+        $incompleteToggle.on('change', function () {
+            $followUpSection.toggleClass('is-active', this.checked);
         });
     }
 
-    function updateSearchFilter() {
-        const query = $searchInput.val()?.toLowerCase() || '';
-        $tableBody.find('tr').each(function () {
-            const $row = $(this);
-            if ($row.hasClass('empty-state')) {
-                return;
-            }
-            const text = $row.text().toLowerCase();
-            $row.toggle(text.includes(query));
-        });
-    }
+    $('#product-image').on('change', function () {
+        const file = this.files && this.files[0];
+        if (!file) {
+            $('#image-preview').attr('src', '').addClass('is-empty');
+            return;
+        }
 
-    $('#inventory-form').on('submit', function (event) {
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            $('#image-preview').attr('src', event.target.result).removeClass('is-empty');
+        };
+        reader.readAsDataURL(file);
+    });
+
+    $form.on('submit', function (event) {
         event.preventDefault();
         const formData = new FormData(this);
         formData.append('action', 'add_product');
@@ -198,40 +291,22 @@ jQuery(document).ready(function ($) {
                 this.reset();
                 $('#image-preview').attr('src', '').addClass('is-empty');
                 $followUpSection.removeClass('is-active');
-                showToast(response.message || 'Produit ajouté.');
+                showToast(response.message || t('toastAddSuccess', 'Produit ajouté.'));
                 loadProducts();
                 loadStats();
             } else {
-                showToast(response.message || 'Erreur lors de l\'ajout.', 'error');
+                showToast(response.message || t('toastAddError', "Erreur lors de l'ajout."), 'error');
             }
         }).fail(() => {
-            showToast('Erreur lors de l\'ajout du produit.', 'error');
+            showToast(t('toastAddError', "Erreur lors de l'ajout."), 'error');
         });
-    });
-
-    $incompleteToggle.on('change', function () {
-        $followUpSection.toggleClass('is-active', this.checked);
-    });
-
-    $('#product-image').on('change', function () {
-        const file = this.files[0];
-        if (!file) {
-            $('#image-preview').attr('src', '').addClass('is-empty');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            $('#image-preview').attr('src', e.target.result).removeClass('is-empty');
-        };
-        reader.readAsDataURL(file);
     });
 
     $(document).on('click', '.delete-product', function () {
         const $row = $(this).closest('tr');
         const id = $row.data('id');
 
-        if (!confirm('Supprimer cet article ?')) {
+        if (!window.confirm(t('deleteConfirm', 'Supprimer cet article ?'))) {
             return;
         }
 
@@ -242,7 +317,7 @@ jQuery(document).ready(function ($) {
             dataType: 'json',
         }).done((response) => {
             if (response.success) {
-                showToast(response.message || 'Article supprimé.');
+                showToast(response.message || t('toastDeleteSuccess', 'Article supprimé.'));
                 $row.remove();
                 if ($tableBody.find('tr').length === 0) {
                     showEmptyState();
@@ -250,10 +325,10 @@ jQuery(document).ready(function ($) {
                 loadStats();
                 loadProducts();
             } else {
-                showToast(response.message || 'Suppression impossible.', 'error');
+                showToast(response.message || t('toastDeleteError', 'Suppression impossible.'), 'error');
             }
         }).fail(() => {
-            showToast('Suppression impossible.', 'error');
+            showToast(t('toastDeleteError', 'Suppression impossible.'), 'error');
         });
     });
 
@@ -274,6 +349,10 @@ jQuery(document).ready(function ($) {
         const field = $cell.data('field');
         let value = $cell.text().trim().replace(',', '.');
         const original = $cell.data('original');
+
+        if (!id) {
+            return;
+        }
 
         if (field === 'stock') {
             value = parseInt(value, 10);
@@ -298,7 +377,7 @@ jQuery(document).ready(function ($) {
             dataType: 'json',
         }).done((response) => {
             if (response.success) {
-                showToast('Valeur mise à jour.');
+                showToast(response.message || t('toastUpdateSuccess', 'Valeur mise à jour.'));
                 const prixAchat = parseFloat($cell.closest('tr').find('[data-field="prix_achat"]').text().replace(',', '.')) || 0;
                 const prixVente = parseFloat($cell.closest('tr').find('[data-field="prix_vente"]').text().replace(',', '.')) || 0;
                 const marge = prixVente - prixAchat;
@@ -307,11 +386,47 @@ jQuery(document).ready(function ($) {
                 loadProducts();
             } else {
                 $cell.text(original);
-                showToast(response.message || 'Mise à jour impossible.', 'error');
+                showToast(response.message || t('toastUpdateError', 'Mise à jour impossible.'), 'error');
             }
         }).fail(() => {
             $cell.text(original);
-            showToast('Mise à jour impossible.', 'error');
+            showToast(t('toastUpdateError', 'Mise à jour impossible.'), 'error');
+        });
+    });
+
+    $(document).on('click', '.toggle-incomplete', function () {
+        const $button = $(this);
+        const $row = $button.closest('tr');
+        const id = $row.data('id');
+        const isCurrentlyIncomplete = $button.data('incomplete') === 1 || $button.data('incomplete') === '1';
+        const nextValue = isCurrentlyIncomplete ? 0 : 1;
+
+        $.ajax({
+            url: ajaxUrl,
+            method: 'POST',
+            data: { action: 'update_product', id, field: 'a_completer', value: nextValue },
+            dataType: 'json',
+        }).done((response) => {
+            if (response.success) {
+                $button.data('incomplete', nextValue);
+                $row.attr('data-incomplete', nextValue ? '1' : '0');
+                const referenceEl = $row.find('.item-reference');
+                if (nextValue) {
+                    if (!referenceEl.find('.status-badge').length) {
+                        referenceEl.append(' <span class="status-badge badge-incomplete">À compléter</span>');
+                    }
+                    $button.text('☑️').attr('title', t('toggleComplete', 'Marquer comme complet'));
+                } else {
+                    referenceEl.find('.status-badge').remove();
+                    $button.text('⏳').attr('title', t('toggleIncomplete', 'Marquer comme à compléter'));
+                }
+                showToast(response.message || t('toastUpdateSuccess', 'Valeur mise à jour.'));
+                loadProducts();
+            } else {
+                showToast(response.message || t('toastUpdateError', 'Mise à jour impossible.'), 'error');
+            }
+        }).fail(() => {
+            showToast(t('toastUpdateError', 'Mise à jour impossible.'), 'error');
         });
     });
 
@@ -372,6 +487,11 @@ jQuery(document).ready(function ($) {
 
             rows.push([nom, reference, prixAchat, prixVente, stock, marge]);
         });
+
+        if (rows.length === 1) {
+            showToast(t('emptyInventory', 'Votre inventaire est vide.'), 'error');
+            return;
+        }
 
         const csvContent = rows
             .map((cols) => cols.map((value) => `"${value.replace(/"/g, '""')}"`).join(';'))
