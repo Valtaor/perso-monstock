@@ -20,6 +20,23 @@
     color: var(--inventory-text);
     padding: 64px 24px 96px;
     min-height: 100vh;
+    position: relative;
+}
+
+.inventory-page::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(circle at 25px 25px, rgba(196, 123, 131, 0.08) 1px, transparent 0), radial-gradient(circle at 25px 25px, rgba(196, 123, 131, 0.04) 1px, transparent 0);
+    background-size: 120px 120px;
+    opacity: 0.65;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.inventory-page > * {
+    position: relative;
+    z-index: 1;
 }
 
 .inventory-page * {
@@ -349,6 +366,18 @@ textarea.form-control {
     opacity: 0.6;
 }
 
+.stat-trend {
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(196, 123, 131, 0.12);
+    color: var(--inventory-rose);
+}
+
 .inventory-table-wrapper {
     overflow-x: auto;
     border-radius: 22px;
@@ -437,6 +466,7 @@ textarea.form-control {
     height: 36px;
     cursor: pointer;
     transition: background 0.2s ease, transform 0.2s ease;
+    border: 1px solid rgba(196, 123, 131, 0.28);
 }
 
 .btn-icon:hover {

@@ -76,6 +76,8 @@ get_header();
                             </label>
                             <input type="file" id="product-image" name="image" accept="image/*" />
                         </div>
+                    </div>
+                </aside>
 
                         <div class="form-grid">
                             <div class="form-group">
@@ -94,13 +96,9 @@ get_header();
                                 <label for="product-prix-achat" class="form-label"><?php esc_html_e('Prix d\'achat (€)', 'uncode'); ?></label>
                                 <input type="number" step="0.01" min="0" id="product-prix-achat" name="prix_achat" class="form-control" placeholder="0.00" />
                             </div>
-                            <div class="form-group">
-                                <label for="product-prix-vente" class="form-label"><?php esc_html_e('Prix de vente (€)', 'uncode'); ?></label>
-                                <input type="number" step="0.01" min="0" id="product-prix-vente" name="prix_vente" class="form-control" placeholder="0.00" />
-                            </div>
-                            <div class="form-group">
-                                <label for="product-stock" class="form-label"><?php esc_html_e('Stock disponible', 'uncode'); ?></label>
-                                <input type="number" min="0" id="product-stock" name="stock" class="form-control" placeholder="1" />
+                            <div class="inventory-actions">
+                                <button type="button" class="inventory-button ghost-button" data-range="30"><?php esc_html_e('30 derniers jours', 'uncode'); ?></button>
+                                <button type="button" class="inventory-button ghost-button" data-range="90"><?php esc_html_e('90 derniers jours', 'uncode'); ?></button>
                             </div>
                             <div class="form-group">
                                 <label for="product-date" class="form-label"><?php esc_html_e('Date d\'achat', 'uncode'); ?></label>
@@ -116,6 +114,7 @@ get_header();
                             <label for="product-description" class="form-label"><?php esc_html_e('À renseigner plus tard', 'uncode'); ?></label>
                             <textarea id="product-description" name="description" class="form-control" rows="3" placeholder="Certificat d'authenticité, histoire de la pièce..."></textarea>
                         </div>
+                    </section>
 
                         <button type="submit" class="inventory-button primary-button"><?php esc_html_e('Ajouter à l\'inventaire', 'uncode'); ?></button>
                     </form>
