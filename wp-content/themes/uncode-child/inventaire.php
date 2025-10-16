@@ -108,20 +108,43 @@ get_header();
                                 <label for="product-notes" class="form-label"><?php esc_html_e('Notes (facultatif)', 'uncode'); ?></label>
                                 <input type="text" id="product-notes" name="notes" class="form-control" placeholder="Matériaux, état..." />
                             </div>
+                            <div class="form-group">
+                                <label for="product-date" class="form-label"><?php esc_html_e('Date d\'achat', 'uncode'); ?></label>
+                                <input type="date" id="product-date" name="date_achat" class="form-control" />
+                            </div>
+                            <div class="form-group">
+                                <label for="product-notes" class="form-label"><?php esc_html_e('Notes (facultatif)', 'uncode'); ?></label>
+                                <input type="text" id="product-notes" name="notes" class="form-control" placeholder="Matériaux, état..." />
+                            </div>
                         </div>
-
-                        <div class="form-section">
-                            <label for="product-description" class="form-label"><?php esc_html_e('À renseigner plus tard', 'uncode'); ?></label>
+                        <section class="form-section inventory-follow-up" aria-labelledby="follow-up-title">
+                            <div class="follow-up-header">
+                                <div>
+                                    <h3 id="follow-up-title"><?php esc_html_e('À renseigner plus tard', 'uncode'); ?></h3>
+                                    <p><?php esc_html_e('Activez cette option pour vous rappeler qu\'il manque des informations à compléter sur cet objet.', 'uncode'); ?></p>
+                                </div>
+                                <label class="inventory-switch">
+                                    <input type="checkbox" id="product-incomplete" name="a_completer" value="1" />
+                                    <span class="switch-slider" aria-hidden="true"></span>
+                                    <span class="sr-only"><?php esc_html_e('Marquer cet objet comme à compléter plus tard', 'uncode'); ?></span>
+                                </label>
+                            </div>
+                            <ul class="follow-up-hints">
+                                <li><?php esc_html_e('Les objets marqués affichent un badge « À compléter » dans votre inventaire.', 'uncode'); ?></li>
+                                <li><?php esc_html_e('Ajoutez un rappel pour les documents ou informations manquants.', 'uncode'); ?></li>
+                            </ul>
+                            <label for="product-description" class="form-label">
+                                <?php esc_html_e('Informations à ajouter plus tard (facultatif)', 'uncode'); ?>
+                            </label>
                             <textarea id="product-description" name="description" class="form-control" rows="3" placeholder="Certificat d'authenticité, histoire de la pièce..."></textarea>
-                        </div>
-                    </section>
+                        </section>
 
                         <button type="submit" class="inventory-button primary-button"><?php esc_html_e('Ajouter à l\'inventaire', 'uncode'); ?></button>
-                    </form>
-                </section>
-            </div>
+                </form>
+            </section>
+        </div>
 
-            <div class="inventory-column inventory-data-column">
+        <div class="inventory-column inventory-data-column">
                 <section class="inventory-card inventory-stats-card" id="inventory-overview">
                     <header class="inventory-card-header">
                         <div>
@@ -221,6 +244,10 @@ get_header();
                         <div class="inventory-alert">
                             <span class="alert-label"><?php esc_html_e('En rupture', 'uncode'); ?></span>
                             <span id="stat-out-of-stock" class="alert-value">0</span>
+                        </div>
+                        <div class="inventory-alert">
+                            <span class="alert-label"><?php esc_html_e('À compléter', 'uncode'); ?></span>
+                            <span id="stat-incomplete" class="alert-value">0</span>
                         </div>
                         <div class="inventory-alert">
                             <span class="alert-label"><?php esc_html_e('Marge moyenne', 'uncode'); ?></span>

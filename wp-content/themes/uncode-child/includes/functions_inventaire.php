@@ -34,6 +34,19 @@ if (function_exists('is_user_logged_in') && !is_user_logged_in()) {
 
 global $pdo;
 
+$inventorySupportsIncomplete = false;
+try {
+    $columnStmt = $pdo->query("SHOW COLUMNS FROM produits LIKE 'a_completer'");
+    if ($columnStmt !== false && $columnStmt->fetch()) {
+        $inventorySupportsIncomplete = true;
+    } else {
+        $pdo->exec("ALTER TABLE produits ADD COLUMN a_completer TINYINT(1) NOT NULL DEFAULT 0");
+        $inventorySupportsIncomplete = true;
+    }
+} catch (PDOException $exception) {
+    $inventorySupportsIncomplete = false;
+}
+
 $action = $_REQUEST['action'] ?? '';
 
 switch ($action) {
@@ -64,12 +77,15 @@ switch ($action) {
  */
 function handle_add_product(PDO $pdo): void
 {
+    global $inventorySupportsIncomplete;
+
     $nom = trim($_POST['nom'] ?? '');
     $reference = trim($_POST['reference'] ?? '');
     $prixAchat = isset($_POST['prix_achat']) ? (float) $_POST['prix_achat'] : 0.0;
     $prixVente = isset($_POST['prix_vente']) ? (float) $_POST['prix_vente'] : 0.0;
     $stock = isset($_POST['stock']) ? (int) $_POST['stock'] : 0;
     $description = trim($_POST['description'] ?? '');
+    $aCompleter = isset($_POST['a_completer']) && (int) $_POST['a_completer'] === 1 ? 1 : 0;
 
     if ($nom === '' || $reference === '') {
         inventory_json_response([
@@ -127,18 +143,34 @@ function handle_add_product(PDO $pdo): void
         }
     }
 
-    $stmt = $pdo->prepare('INSERT INTO produits (nom, reference, prix_achat, prix_vente, stock, description, image, ajoute_par) VALUES (:nom, :reference, :prix_achat, :prix_vente, :stock, :description, :image, :ajoute_par)');
+    if ($inventorySupportsIncomplete) {
+        $stmt = $pdo->prepare('INSERT INTO produits (nom, reference, prix_achat, prix_vente, stock, description, image, ajoute_par, a_completer) VALUES (:nom, :reference, :prix_achat, :prix_vente, :stock, :description, :image, :ajoute_par, :a_completer)');
 
-    $stmt->execute([
-        ':nom' => $nom,
-        ':reference' => $reference,
-        ':prix_achat' => $prixAchat,
-        ':prix_vente' => $prixVente,
-        ':stock' => $stock,
-        ':description' => $description,
-        ':image' => $imageName,
-        ':ajoute_par' => $ajoutePar,
-    ]);
+        $stmt->execute([
+            ':nom' => $nom,
+            ':reference' => $reference,
+            ':prix_achat' => $prixAchat,
+            ':prix_vente' => $prixVente,
+            ':stock' => $stock,
+            ':description' => $description,
+            ':image' => $imageName,
+            ':ajoute_par' => $ajoutePar,
+            ':a_completer' => $aCompleter,
+        ]);
+    } else {
+        $stmt = $pdo->prepare('INSERT INTO produits (nom, reference, prix_achat, prix_vente, stock, description, image, ajoute_par) VALUES (:nom, :reference, :prix_achat, :prix_vente, :stock, :description, :image, :ajoute_par)');
+
+        $stmt->execute([
+            ':nom' => $nom,
+            ':reference' => $reference,
+            ':prix_achat' => $prixAchat,
+            ':prix_vente' => $prixVente,
+            ':stock' => $stock,
+            ':description' => $description,
+            ':image' => $imageName,
+            ':ajoute_par' => $ajoutePar,
+        ]);
+    }
 
     inventory_json_response([
         'success' => true,
@@ -151,6 +183,8 @@ function handle_add_product(PDO $pdo): void
  */
 function handle_get_products(PDO $pdo): void
 {
+    global $inventorySupportsIncomplete;
+
     $stmt = $pdo->query('SELECT * FROM produits ORDER BY id DESC');
     $products = [];
 
@@ -158,6 +192,11 @@ function handle_get_products(PDO $pdo): void
         $row['prix_achat'] = isset($row['prix_achat']) ? (float) $row['prix_achat'] : 0.0;
         $row['prix_vente'] = isset($row['prix_vente']) ? (float) $row['prix_vente'] : 0.0;
         $row['stock'] = isset($row['stock']) ? (int) $row['stock'] : 0;
+        if (!array_key_exists('a_completer', $row) || !$inventorySupportsIncomplete) {
+            $row['a_completer'] = 0;
+        } else {
+            $row['a_completer'] = (int) $row['a_completer'];
+        }
         $products[] = $row;
     }
 
@@ -217,6 +256,8 @@ function handle_get_stats(PDO $pdo): void
  */
 function handle_update_product(PDO $pdo): void
 {
+    global $inventorySupportsIncomplete;
+
     $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
     $field = $_POST['field'] ?? '';
     $value = $_POST['value'] ?? null;
@@ -226,6 +267,10 @@ function handle_update_product(PDO $pdo): void
         'prix_vente' => 'float',
         'stock' => 'int',
     ];
+
+    if ($inventorySupportsIncomplete) {
+        $allowedFields['a_completer'] = 'int';
+    }
 
     if ($id <= 0 || !isset($allowedFields[$field])) {
         inventory_json_response([
@@ -240,6 +285,9 @@ function handle_update_product(PDO $pdo): void
             break;
         case 'int':
             $value = (int) $value;
+            if ($field === 'a_completer') {
+                $value = $value === 1 ? 1 : 0;
+            }
             break;
     }
 
