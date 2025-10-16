@@ -10,17 +10,71 @@
     --inventory-shadow: 0 12px 30px rgba(196, 123, 131, 0.12);
 }
 
+/* Neutralise les surcharges du thème "neo" pour conserver la palette pastel */
+.inventory-page.inventory-theme-neo {
+    --inventory-rose: #c47b83;
+    --inventory-beige: #f8f6f5;
+    --inventory-gray: #f2f2f2;
+    --inventory-text: #333333;
+    --inventory-white: #ffffff;
+    --inventory-shadow: 0 12px 30px rgba(196, 123, 131, 0.12);
+    background-color: var(--inventory-beige);
+    color: var(--inventory-text);
+}
+
 .inventory-page {
     font-family: var(--inventory-font);
-    background-color: var(--inventory-beige);
-    padding: 60px 20px;
+    background: linear-gradient(180deg, rgba(248, 246, 245, 0.96) 0%, rgba(255, 255, 255, 0.88) 45%, rgba(248, 246, 245, 0.96) 100%);
+    padding: 72px 28px;
     color: var(--inventory-text);
     min-height: 100vh;
+    position: relative;
+}
+
+.inventory-page::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(circle at 25px 25px, rgba(196, 123, 131, 0.08) 1px, transparent 0), radial-gradient(circle at 25px 25px, rgba(196, 123, 131, 0.04) 1px, transparent 0);
+    background-size: 120px 120px;
+    opacity: 0.65;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.inventory-page > * {
+    position: relative;
+    z-index: 1;
 }
 
 .inventory-wrapper {
-    max-width: 1240px;
+    max-width: 1320px;
     margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+}
+
+.inventory-dashboard-layout {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: 32px;
+    align-items: start;
+}
+
+.inventory-dashboard-layout .inventory-card {
+    margin-bottom: 0;
+}
+
+.inventory-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.inventory-sidebar .inventory-card {
+    position: sticky;
+    top: 110px;
 }
 
 .inventory-access-denied {
@@ -31,24 +85,53 @@
 }
 
 .inventory-card {
-    background: var(--inventory-white);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(248, 246, 245, 0.9));
     border-radius: 16px;
     box-shadow: var(--inventory-shadow);
     padding: 32px;
     margin-bottom: 28px;
     position: relative;
     overflow: hidden;
+    border: 1px solid rgba(196, 123, 131, 0.18);
 }
 
 .inventory-title {
-    font-size: 1.8rem;
+    font-size: 2rem;
     color: var(--inventory-rose);
-    margin-bottom: 12px;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
 }
 
 .inventory-subtitle {
     color: rgba(51, 51, 51, 0.72);
+    margin-bottom: 32px;
+}
+
+.inventory-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
     margin-bottom: 28px;
+}
+
+.inventory-search-group {
+    position: relative;
+    flex: 1 1 320px;
+}
+
+.inventory-search-group .search-input {
+    padding-left: 44px;
+}
+
+.inventory-search-group .search-icon {
+    position: absolute;
+    top: 50%;
+    left: 16px;
+    transform: translateY(-50%);
+    color: rgba(51, 51, 51, 0.5);
+    font-size: 1.05rem;
 }
 
 .inventory-columns {
@@ -61,6 +144,7 @@
     position: sticky;
     top: 110px;
     height: fit-content;
+    background: rgba(255, 255, 255, 0.96);
 }
 
 .inventory-form .form-section,
@@ -89,7 +173,7 @@
     font-family: var(--inventory-font);
     border-radius: 12px;
     border: 1px solid transparent;
-    background: var(--inventory-gray);
+    background: rgba(242, 242, 242, 0.9);
     padding: 12px 16px;
     font-size: 0.95rem;
     transition: all 0.2s ease-in-out;
@@ -186,6 +270,7 @@ textarea.form-control {
     color: var(--inventory-white);
     font-weight: 600;
     margin-top: 12px;
+    box-shadow: 0 8px 20px rgba(196, 123, 131, 0.25);
 }
 
 .inventory-button.primary-button:hover {
@@ -193,18 +278,24 @@ textarea.form-control {
 }
 
 .inventory-button.ghost-button {
-    background: rgba(196, 123, 131, 0.12);
+    background: rgba(196, 123, 131, 0.18);
     color: var(--inventory-rose);
     font-weight: 600;
+    border: 1px solid rgba(196, 123, 131, 0.28);
 }
 
 .inventory-button.ghost-button:hover {
     background: rgba(196, 123, 131, 0.22);
 }
 
+.inventory-button:focus-visible {
+    outline: 3px solid rgba(196, 123, 131, 0.45);
+    outline-offset: 2px;
+}
+
 .inventory-button:hover {
     transform: translateY(-1px);
-    box-shadow: 0 10px 20px rgba(196, 123, 131, 0.18);
+    box-shadow: 0 12px 26px rgba(196, 123, 131, 0.28);
 }
 
 .inventory-data-header {
@@ -230,38 +321,52 @@ textarea.form-control {
 
 .inventory-stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 18px;
-    margin-bottom: 32px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 22px;
+    margin-bottom: 36px;
 }
 
 .stat-card {
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(248, 246, 245, 0.6));
-    border-radius: 14px;
-    padding: 20px;
-    border: 1px solid rgba(196, 123, 131, 0.12);
-    box-shadow: 0 8px 18px rgba(196, 123, 131, 0.1);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(196, 123, 131, 0.08));
+    border-radius: 18px;
+    padding: 24px;
+    border: 1px solid rgba(196, 123, 131, 0.18);
+    box-shadow: 0 14px 32px rgba(196, 123, 131, 0.18);
+    display: grid;
+    gap: 12px;
 }
 
 .stat-card h3 {
-    font-size: 0.95rem;
-    color: rgba(51, 51, 51, 0.75);
-    margin-bottom: 12px;
+    font-size: 0.9rem;
+    color: rgba(51, 51, 51, 0.65);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
 }
 
 .stat-value {
-    font-size: 1.6rem;
+    font-size: 2rem;
     font-weight: 700;
     color: var(--inventory-rose);
 }
 
+.stat-trend {
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(196, 123, 131, 0.18);
+    color: var(--inventory-rose);
+}
+
 .inventory-table-wrapper {
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.94);
     border-radius: 16px;
     overflow: hidden;
-    border: 1px solid rgba(196, 123, 131, 0.08);
+    border: 1px solid rgba(196, 123, 131, 0.16);
+    box-shadow: 0 18px 36px rgba(196, 123, 131, 0.16);
 }
 
 .inventory-table {
@@ -271,7 +376,7 @@ textarea.form-control {
 }
 
 .inventory-table thead {
-    background: rgba(196, 123, 131, 0.12);
+    background: rgba(196, 123, 131, 0.18);
 }
 
 .inventory-table th,
@@ -281,8 +386,8 @@ textarea.form-control {
 }
 
 .inventory-table th {
-    font-weight: 600;
-    color: rgba(51, 51, 51, 0.7);
+    font-weight: 700;
+    color: rgba(51, 51, 51, 0.82);
     font-size: 0.85rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -290,16 +395,18 @@ textarea.form-control {
 
 .inventory-table tbody tr {
     background: var(--inventory-white);
-    transition: background 0.2s ease, transform 0.2s ease;
+    transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    border-bottom: 1px solid rgba(196, 123, 131, 0.12);
 }
 
 .inventory-table tbody tr:nth-child(even) {
-    background: #fbf9f8;
+    background: #f6efee;
 }
 
 .inventory-table tbody tr:hover {
-    background: rgba(196, 123, 131, 0.08);
+    background: rgba(196, 123, 131, 0.14);
     transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(196, 123, 131, 0.18);
 }
 
 .inventory-thumb {
@@ -353,7 +460,7 @@ textarea.form-control {
 
 .btn-icon {
     border: none;
-    background: rgba(196, 123, 131, 0.15);
+    background: rgba(196, 123, 131, 0.18);
     color: var(--inventory-rose);
     border-radius: 50%;
     width: 36px;
@@ -363,6 +470,7 @@ textarea.form-control {
     align-items: center;
     cursor: pointer;
     transition: background 0.2s ease, transform 0.2s ease;
+    border: 1px solid rgba(196, 123, 131, 0.28);
 }
 
 .btn-icon:hover {
@@ -392,6 +500,81 @@ textarea.form-control {
     flex-direction: column;
     gap: 12px;
     z-index: 9999;
+    align-items: flex-end;
+}
+
+.inventory-toast-stack .inventory-toast {
+    min-width: 260px;
+}
+
+.inventory-quick-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.inventory-quick-filters .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(196, 123, 131, 0.18);
+    color: var(--inventory-rose);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid rgba(196, 123, 131, 0.24);
+}
+
+.inventory-quick-filters .filter-chip:hover,
+.inventory-quick-filters .filter-chip.is-active {
+    background: rgba(196, 123, 131, 0.28);
+    box-shadow: 0 8px 16px rgba(196, 123, 131, 0.24);
+}
+
+.inventory-kanban {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 24px;
+}
+
+.inventory-kanban-column {
+    background: rgba(255, 255, 255, 0.94);
+    border-radius: 16px;
+    border: 1px solid rgba(196, 123, 131, 0.16);
+    box-shadow: 0 16px 30px rgba(196, 123, 131, 0.14);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.inventory-kanban-column h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--inventory-rose);
+    margin-bottom: 4px;
+}
+
+.inventory-kanban-card {
+    background: rgba(248, 246, 245, 0.8);
+    border-radius: 14px;
+    padding: 16px;
+    border: 1px solid rgba(196, 123, 131, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(196, 123, 131, 0.08);
+}
+
+.inventory-kanban-card strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--inventory-text);
+}
+
+.inventory-kanban-card span {
+    font-size: 0.85rem;
+    color: rgba(51, 51, 51, 0.6);
 }
 
 .inventory-toast {
@@ -399,7 +582,8 @@ textarea.form-control {
     color: var(--inventory-white);
     padding: 14px 22px;
     border-radius: 14px;
-    box-shadow: 0 10px 25px rgba(196, 123, 131, 0.22);
+    box-shadow: 0 12px 32px rgba(196, 123, 131, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.4);
     opacity: 0;
     transform: translateY(20px);
     transition: all 0.3s ease;
@@ -435,6 +619,10 @@ textarea.form-control {
         grid-template-columns: 1fr;
     }
 
+    .inventory-dashboard-layout {
+        grid-template-columns: 1fr;
+    }
+
     .inventory-form-card {
         position: static;
     }
@@ -442,11 +630,20 @@ textarea.form-control {
 
 @media (max-width: 768px) {
     .inventory-page {
-        padding: 40px 16px;
+        padding: 48px 18px;
     }
 
     .inventory-card {
         padding: 24px;
+    }
+
+    .inventory-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .inventory-search-group {
+        width: 100%;
     }
 
     .inventory-form .form-grid {
