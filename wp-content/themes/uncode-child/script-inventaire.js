@@ -8,7 +8,13 @@ jQuery(document).ready(function ($) {
     const $statsValeurVente = $('#stat-valeur-vente');
     const $statsMargeTotale = $('#stat-marge-totale');
     const $searchInput = $('#inventory-search');
+    const $statLowStock = $('#stat-low-stock');
+    const $statOutOfStock = $('#stat-out-of-stock');
+    const $statAverageMargin = $('#stat-average-margin');
+    const $statIncomplete = $('#stat-incomplete');
     const $toastContainer = $('.inventory-toast-stack');
+    const $followUpSection = $('.inventory-follow-up');
+    const $incompleteToggle = $('#product-incomplete');
 
     function formatCurrency(value) {
         return Number(value || 0).toLocaleString('fr-FR', {
@@ -22,24 +28,71 @@ jQuery(document).ready(function ($) {
         const imageCell = product.image
             ? `<img src="${uploadsUrl}${product.image}" alt="${product.nom}" class="inventory-thumb">`
             : '<div class="inventory-thumb placeholder">✨</div>';
+        const isIncomplete = Number(product.a_completer) === 1;
         const marge = (Number(product.prix_vente) - Number(product.prix_achat)).toFixed(2);
+        const statusBadge = isIncomplete
+            ? '<span class="status-badge badge-incomplete">À compléter</span>'
+            : '';
+        const toggleTitle = isIncomplete ? 'Marquer comme complet' : 'Marquer comme à compléter';
+        const toggleIcon = isIncomplete ? '☑️' : '⏳';
 
         return `
-            <tr data-id="${product.id}">
+            <tr data-id="${product.id}" data-incomplete="${isIncomplete ? '1' : '0'}">
                 <td class="cell-image">${imageCell}</td>
                 <td class="cell-title">
                     <div class="item-name">${product.nom || ''}</div>
-                    <div class="item-reference">${product.reference || ''}</div>
+                    <div class="item-reference">${product.reference || ''} ${statusBadge}</div>
                 </td>
                 <td class="cell-price inventory-editable" contenteditable="true" data-field="prix_achat">${Number(product.prix_achat).toFixed(2)}</td>
                 <td class="cell-price inventory-editable" contenteditable="true" data-field="prix_vente">${Number(product.prix_vente).toFixed(2)}</td>
                 <td class="cell-stock inventory-editable" contenteditable="true" data-field="stock">${parseInt(product.stock, 10)}</td>
                 <td class="cell-marge">${formatCurrency(marge)}</td>
                 <td class="cell-actions">
+                    <button class="btn-icon toggle-incomplete" data-incomplete="${isIncomplete ? '1' : '0'}" title="${toggleTitle}">${toggleIcon}</button>
                     <button class="btn-icon delete-product" title="Supprimer">✖</button>
                 </td>
             </tr>
         `;
+    }
+
+    function updateDerivedStats(products) {
+        if (!Array.isArray(products) || products.length === 0) {
+            $statLowStock.text(0);
+            $statOutOfStock.text(0);
+            $statAverageMargin.text(formatCurrency(0));
+            return;
+        }
+
+        let lowStock = 0;
+        let outOfStock = 0;
+        let totalMargin = 0;
+        let marginCount = 0;
+        let incompleteCount = 0;
+
+        products.forEach((product) => {
+            const stockValue = parseInt(product.stock, 10) || 0;
+            if (stockValue <= 0) {
+                outOfStock += 1;
+            } else if (stockValue <= 3) {
+                lowStock += 1;
+            }
+
+            const prixAchat = parseFloat(product.prix_achat) || 0;
+            const prixVente = parseFloat(product.prix_vente) || 0;
+            const marge = prixVente - prixAchat;
+            totalMargin += marge;
+            marginCount += 1;
+
+            if (Number(product.a_completer) === 1) {
+                incompleteCount += 1;
+            }
+        });
+
+        $statLowStock.text(lowStock);
+        $statOutOfStock.text(outOfStock);
+        const averageMargin = marginCount ? totalMargin / marginCount : 0;
+        $statAverageMargin.text(formatCurrency(averageMargin));
+        $statIncomplete.text(incompleteCount);
     }
 
     function showEmptyState() {
@@ -53,6 +106,8 @@ jQuery(document).ready(function ($) {
                 </td>
             </tr>
         `);
+        updateDerivedStats([]);
+        $statIncomplete.text(0);
     }
 
     function showToast(message, type = 'success') {
@@ -89,6 +144,7 @@ jQuery(document).ready(function ($) {
 
                 const rows = response.data.map((product) => buildRow(product)).join('');
                 $tableBody.html(rows);
+                updateDerivedStats(response.data);
                 updateSearchFilter();
             }
         }).fail(() => {
@@ -128,6 +184,7 @@ jQuery(document).ready(function ($) {
         event.preventDefault();
         const formData = new FormData(this);
         formData.append('action', 'add_product');
+        formData.set('a_completer', $incompleteToggle.is(':checked') ? '1' : '0');
 
         $.ajax({
             url: ajaxUrl,
@@ -140,6 +197,7 @@ jQuery(document).ready(function ($) {
             if (response.success) {
                 this.reset();
                 $('#image-preview').attr('src', '').addClass('is-empty');
+                $followUpSection.removeClass('is-active');
                 showToast(response.message || 'Produit ajouté.');
                 loadProducts();
                 loadStats();
@@ -149,6 +207,10 @@ jQuery(document).ready(function ($) {
         }).fail(() => {
             showToast('Erreur lors de l\'ajout du produit.', 'error');
         });
+    });
+
+    $incompleteToggle.on('change', function () {
+        $followUpSection.toggleClass('is-active', this.checked);
     });
 
     $('#product-image').on('change', function () {
@@ -186,6 +248,7 @@ jQuery(document).ready(function ($) {
                     showEmptyState();
                 }
                 loadStats();
+                loadProducts();
             } else {
                 showToast(response.message || 'Suppression impossible.', 'error');
             }
@@ -241,12 +304,49 @@ jQuery(document).ready(function ($) {
                 const marge = prixVente - prixAchat;
                 $cell.closest('tr').find('.cell-marge').text(formatCurrency(marge));
                 loadStats();
+                loadProducts();
             } else {
                 $cell.text(original);
                 showToast(response.message || 'Mise à jour impossible.', 'error');
             }
         }).fail(() => {
             $cell.text(original);
+            showToast('Mise à jour impossible.', 'error');
+        });
+    });
+
+    $(document).on('click', '.toggle-incomplete', function () {
+        const $button = $(this);
+        const $row = $button.closest('tr');
+        const id = $row.data('id');
+        const isCurrentlyIncomplete = $button.data('incomplete') === 1 || $button.data('incomplete') === '1';
+        const nextValue = isCurrentlyIncomplete ? 0 : 1;
+
+        $.ajax({
+            url: ajaxUrl,
+            method: 'POST',
+            data: { action: 'update_product', id, field: 'a_completer', value: nextValue },
+            dataType: 'json',
+        }).done((response) => {
+            if (response.success) {
+                $button.data('incomplete', nextValue);
+                $row.attr('data-incomplete', nextValue ? '1' : '0');
+                const referenceEl = $row.find('.item-reference');
+                if (nextValue) {
+                    if (!referenceEl.find('.status-badge').length) {
+                        referenceEl.append(' <span class="status-badge badge-incomplete">À compléter</span>');
+                    }
+                    $button.text('☑️').attr('title', 'Marquer comme complet');
+                } else {
+                    referenceEl.find('.status-badge').remove();
+                    $button.text('⏳').attr('title', 'Marquer comme à compléter');
+                }
+                showToast('Statut mis à jour.');
+                loadProducts();
+            } else {
+                showToast(response.message || 'Mise à jour impossible.', 'error');
+            }
+        }).fail(() => {
             showToast('Mise à jour impossible.', 'error');
         });
     });
