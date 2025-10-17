@@ -274,6 +274,8 @@ textarea {
     width: 100%;
     height: auto;
     display: block;
+    border-radius: var(--inventory-radius-md);
+    transition: opacity 220ms ease;
 }
 
 .photo-preview.visible {
@@ -813,6 +815,7 @@ body.inventory-dark .mobile-action-bar {
     .form-grid {
         grid-template-columns: 1fr;
     }
+}
 
     .follow-up-group {
         padding: 18px;
@@ -918,7 +921,6 @@ body.inventory-dark .mobile-action-bar {
     .empty-state {
         margin: 1.5rem;
     }
-}
 
 @media (min-width: 640px) {
     .follow-up-top {

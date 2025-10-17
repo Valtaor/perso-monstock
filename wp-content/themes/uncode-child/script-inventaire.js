@@ -89,9 +89,28 @@ jQuery(function ($) {
             </div>
         `);
 
-        $toastContainer.append($toast);
-        requestAnimationFrame(() => {
-            $toast.addClass('visible');
+        let lowStock = 0;
+        let outOfStock = 0;
+        let totalMargin = 0;
+        let marginCount = 0;
+        let incompleteCount = 0;
+
+        products.forEach((product) => {
+            const stockValue = parseInt(product.stock, 10) || 0;
+            if (stockValue <= 0) {
+                outOfStock += 1;
+            } else if (stockValue <= 3) {
+                lowStock += 1;
+            }
+
+            const prixAchat = parseFloat(product.prix_achat) || 0;
+            const prixVente = parseFloat(product.prix_vente) || 0;
+            totalMargin += prixVente - prixAchat;
+            marginCount += 1;
+
+            if (Number(product.a_completer) === 1) {
+                incompleteCount += 1;
+            }
         });
 
         setTimeout(() => {

@@ -264,6 +264,8 @@ function inventory_get_table_columns(PDO $pdo): array
  */
 function handle_get_products(PDO $pdo, bool $supportsIncomplete): void
 {
+    global $inventorySupportsIncomplete;
+
     $stmt = $pdo->query('SELECT * FROM produits ORDER BY id DESC');
     $products = [];
 
@@ -333,6 +335,8 @@ function handle_get_stats(PDO $pdo): void
  */
 function handle_update_product(PDO $pdo, bool $supportsIncomplete): void
 {
+    global $inventorySupportsIncomplete;
+
     $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
     $field = isset($_POST['field']) ? (string) $_POST['field'] : '';
     $value = $_POST['value'] ?? null;
