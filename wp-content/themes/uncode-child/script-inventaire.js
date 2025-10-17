@@ -34,6 +34,15 @@ jQuery(document).ready(function ($) {
         });
     }
 
+    function escapeHtml(value) {
+        return (value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     function showToast(message, type = 'success') {
         if (!message) {
             return;
@@ -58,29 +67,39 @@ jQuery(document).ready(function ($) {
 
     function buildRow(product) {
         const imageCell = product.image
-            ? `<img src="${uploadsUrl}${product.image}" alt="${product.nom || ''}" class="inventory-thumb">`
+            ? `<img src="${uploadsUrl}${product.image}" alt="${escapeHtml(product.nom)}" class="inventory-thumb">`
             : '<div class="inventory-thumb placeholder">✨</div>';
         const isIncomplete = Number(product.a_completer) === 1;
         const statusBadge = isIncomplete
             ? '<span class="status-badge badge-incomplete">À compléter</span>'
-            : '';
+            : '<span class="status-badge badge-complete">Complet</span>';
         const toggleTitle = isIncomplete ? t('toggleComplete', 'Marquer comme complet') : t('toggleIncomplete', 'Marquer comme à compléter');
         const toggleIcon = isIncomplete ? '☑️' : '⏳';
         const prixAchat = Number(product.prix_achat || 0);
         const prixVente = Number(product.prix_vente || 0);
         const marge = prixVente - prixAchat;
+        const reference = escapeHtml(product.reference);
+        const emplacement = escapeHtml(product.emplacement);
+        const notes = escapeHtml(product.notes);
+        const dateAchat = product.date_achat ? escapeHtml(product.date_achat) : '';
 
         return `
             <tr data-id="${product.id}" data-incomplete="${isIncomplete ? '1' : '0'}">
                 <td class="cell-image">${imageCell}</td>
                 <td class="cell-title">
-                    <div class="item-name">${product.nom || ''}</div>
-                    <div class="item-reference">${product.reference || ''} ${statusBadge}</div>
+                    <div class="item-name">${escapeHtml(product.nom)}</div>
+                    <div class="item-meta">
+                        ${notes ? `<span class="item-note">${notes}</span>` : ''}
+                        ${dateAchat ? `<span class="item-date">${dateAchat}</span>` : ''}
+                    </div>
                 </td>
+                <td class="cell-reference">${reference || '—'}</td>
+                <td class="cell-location">${emplacement || '—'}</td>
                 <td class="cell-price inventory-editable" contenteditable="true" data-field="prix_achat">${prixAchat.toFixed(2)}</td>
                 <td class="cell-price inventory-editable" contenteditable="true" data-field="prix_vente">${prixVente.toFixed(2)}</td>
                 <td class="cell-stock inventory-editable" contenteditable="true" data-field="stock">${parseInt(product.stock, 10) || 0}</td>
                 <td class="cell-marge">${formatCurrency(marge)}</td>
+                <td class="cell-status">${statusBadge}</td>
                 <td class="cell-actions">
                     <button class="btn-icon toggle-incomplete" data-incomplete="${isIncomplete ? '1' : '0'}" title="${toggleTitle}">${toggleIcon}</button>
                     <button class="btn-icon delete-product" title="Supprimer">✖</button>
@@ -132,7 +151,7 @@ jQuery(document).ready(function ($) {
     function showEmptyState() {
         $tableBody.html(`
             <tr class="empty-state">
-                <td colspan="7">
+                <td colspan="10">
                     <div class="empty-wrapper">
                         <span class="empty-icon">💎</span>
                         <p>${t('emptySearch', "Aucun bijou dans l'inventaire pour le moment.")}</p>
@@ -185,6 +204,8 @@ jQuery(document).ready(function ($) {
     function updateSearchFilter() {
         const query = ($searchInput.val() || '').toLowerCase();
         let visibleRows = 0;
+        const $existingSearchEmpty = $tableBody.find('tr.search-empty');
+        $existingSearchEmpty.remove();
         $tableBody.find('tr').each(function () {
             const $row = $(this);
             if ($row.hasClass('empty-state')) {
@@ -199,7 +220,16 @@ jQuery(document).ready(function ($) {
         });
 
         if (visibleRows === 0) {
-            showEmptyState();
+            $tableBody.append(`
+                <tr class="empty-state search-empty">
+                    <td colspan="10">
+                        <div class="empty-wrapper">
+                            <span class="empty-icon">🔍</span>
+                            <p>${t('emptySearch', "Aucun bijou ne correspond à votre recherche.")}</p>
+                        </div>
+                    </td>
+                </tr>
+            `);
         }
     }
 
@@ -410,14 +440,12 @@ jQuery(document).ready(function ($) {
             if (response.success) {
                 $button.data('incomplete', nextValue);
                 $row.attr('data-incomplete', nextValue ? '1' : '0');
-                const referenceEl = $row.find('.item-reference');
+                const statusCell = $row.find('.cell-status');
                 if (nextValue) {
-                    if (!referenceEl.find('.status-badge').length) {
-                        referenceEl.append(' <span class="status-badge badge-incomplete">À compléter</span>');
-                    }
+                    statusCell.html('<span class="status-badge badge-incomplete">À compléter</span>');
                     $button.text('☑️').attr('title', t('toggleComplete', 'Marquer comme complet'));
                 } else {
-                    referenceEl.find('.status-badge').remove();
+                    statusCell.html('<span class="status-badge badge-complete">Complet</span>');
                     $button.text('⏳').attr('title', t('toggleIncomplete', 'Marquer comme à compléter'));
                 }
                 showToast(response.message || t('toastUpdateSuccess', 'Valeur mise à jour.'));
@@ -434,7 +462,7 @@ jQuery(document).ready(function ($) {
 
     $('#export-csv').on('click', function () {
         const rows = [];
-        rows.push(['Nom', 'Référence', 'Prix achat', 'Prix vente', 'Stock', 'Marge']);
+        rows.push(['Nom', 'Référence', 'Casier', 'Prix achat', 'Prix vente', 'Stock', 'Marge', 'Statut']);
 
         $tableBody.find('tr').each(function () {
             const $row = $(this);
@@ -443,13 +471,15 @@ jQuery(document).ready(function ($) {
             }
 
             const nom = $row.find('.item-name').text().trim();
-            const reference = $row.find('.item-reference').text().trim();
+            const reference = $row.find('.cell-reference').text().trim();
+            const casier = $row.find('.cell-location').text().trim();
             const prixAchat = $row.find('[data-field="prix_achat"]').text().trim();
             const prixVente = $row.find('[data-field="prix_vente"]').text().trim();
             const stock = $row.find('[data-field="stock"]').text().trim();
             const marge = $row.find('.cell-marge').text().trim();
+            const statut = $row.find('.cell-status').text().trim();
 
-            rows.push([nom, reference, prixAchat, prixVente, stock, marge]);
+            rows.push([nom, reference, casier, prixAchat, prixVente, stock, marge, statut]);
         });
 
         if (rows.length === 1) {
