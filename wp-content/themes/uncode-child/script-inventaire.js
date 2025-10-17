@@ -108,6 +108,46 @@ jQuery(document).ready(function ($) {
         `;
     }
 
+    function updateDerivedStats(products) {
+        if (!Array.isArray(products) || products.length === 0) {
+            $statLowStock.text(0);
+            $statOutOfStock.text(0);
+            $statAverageMargin.text(formatCurrency(0));
+            return;
+        }
+
+        let lowStock = 0;
+        let outOfStock = 0;
+        let totalMargin = 0;
+        let marginCount = 0;
+        let incompleteCount = 0;
+
+        products.forEach((product) => {
+            const stockValue = parseInt(product.stock, 10) || 0;
+            if (stockValue <= 0) {
+                outOfStock += 1;
+            } else if (stockValue <= 3) {
+                lowStock += 1;
+            }
+
+            const prixAchat = parseFloat(product.prix_achat) || 0;
+            const prixVente = parseFloat(product.prix_vente) || 0;
+            const marge = prixVente - prixAchat;
+            totalMargin += marge;
+            marginCount += 1;
+
+            if (Number(product.a_completer) === 1) {
+                incompleteCount += 1;
+            }
+        });
+
+        $statLowStock.text(lowStock);
+        $statOutOfStock.text(outOfStock);
+        const averageMargin = marginCount ? totalMargin / marginCount : 0;
+        $statAverageMargin.text(formatCurrency(averageMargin));
+        $statIncomplete.text(incompleteCount);
+    }
+
     function showEmptyState() {
         $tableBody.html(`
             <tr class="empty-state">
