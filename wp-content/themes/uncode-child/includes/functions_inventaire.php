@@ -171,6 +171,9 @@ function handle_add_product(PDO $pdo, bool $supportsIncomplete): void
     $prixAchat = isset($_POST['prix_achat']) ? (float) $_POST['prix_achat'] : 0.0;
     $prixVente = isset($_POST['prix_vente']) ? (float) $_POST['prix_vente'] : 0.0;
     $stock = isset($_POST['stock']) ? max(0, (int) $_POST['stock']) : 0;
+    $emplacement = trim((string) ($_POST['emplacement'] ?? ''));
+    $notes = trim((string) ($_POST['notes'] ?? ''));
+    $dateAchat = trim((string) ($_POST['date_achat'] ?? ''));
     $description = trim((string) ($_POST['description'] ?? ''));
     $aCompleter = isset($_POST['a_completer']) && (int) $_POST['a_completer'] === 1 ? 1 : 0;
 
@@ -204,6 +207,22 @@ function handle_add_product(PDO $pdo, bool $supportsIncomplete): void
         ':ajoute_par' => $ajoutePar,
     ];
 
+    $optionalColumns = [
+        'emplacement' => $emplacement,
+        'notes' => $notes,
+        'date_achat' => $dateAchat !== '' ? $dateAchat : null,
+    ];
+
+    $availableColumns = inventory_get_table_columns($pdo);
+
+    foreach ($optionalColumns as $column => $value) {
+        if (in_array($column, $availableColumns, true)) {
+            $query .= ', ' . $column;
+            $values .= ', :' . $column;
+            $params[':' . $column] = $value === '' ? null : $value;
+        }
+    }
+
     if ($supportsIncomplete) {
         $query .= ', a_completer';
         $values .= ', :a_completer';
@@ -219,6 +238,25 @@ function handle_add_product(PDO $pdo, bool $supportsIncomplete): void
         'success' => true,
         'message' => inventory_translate('Produit ajouté avec succès.'),
     ]);
+}
+
+/**
+ * Retrieve the list of columns available on the produits table.
+ */
+function inventory_get_table_columns(PDO $pdo): array
+{
+    $columns = [];
+    $stmt = $pdo->query('SHOW COLUMNS FROM produits');
+
+    if ($stmt !== false) {
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            if (isset($row['Field'])) {
+                $columns[] = $row['Field'];
+            }
+        }
+    }
+
+    return $columns;
 }
 
 /**
