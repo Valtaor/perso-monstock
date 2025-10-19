@@ -1,529 +1,298 @@
 <?php
 /**
- * AJAX facade for the inventory dashboard.
+ * Logique AJAX pour l'inventaire - Version finale corrigée et complète
+ * Inclut la gestion des champs 'notes' et 'date_achat'.
  */
-
 declare(strict_types=1);
 
-// Attempt to bootstrap WordPress when the script is reached directly so we can
-// leverage localisation helpers and authentication checks.
-$rootPath = dirname(__FILE__, 5);
-if (is_dir($rootPath) && file_exists($rootPath . '/wp-load.php')) {
-    require_once $rootPath . '/wp-load.php';
+if (!defined('ABSPATH')) {
+    exit; // Sécurité
 }
 
 require_once __DIR__ . '/db_connect.php';
 
-header('Content-Type: application/json; charset=utf-8');
+// --- Enregistrement des actions AJAX WordPress ---
+add_action('wp_ajax_get_products', 'inventory_get_products_ajax');
+add_action('wp_ajax_add_product', 'inventory_add_product_ajax');
+add_action('wp_ajax_update_product', 'inventory_update_product_ajax');
+add_action('wp_ajax_delete_product', 'inventory_delete_product_ajax');
 
 /**
- * Output a JSON payload and terminate.
+ * Vérification préliminaire (Login + DB) pour chaque appel AJAX
  */
-function inventory_json_response(array $payload, int $statusCode = 200): void
+function inventory_ajax_precheck(): PDO
 {
-    http_response_code($statusCode);
-    echo json_encode($payload);
-    exit;
-}
-
-/**
- * Build a translated string even when WordPress is unavailable.
- */
-function inventory_translate(string $text): string
-{
-    if (function_exists('__')) {
-        return __($text, 'uncode');
+    if (!is_user_logged_in()) {
+        wp_send_json_error(['message' => 'Authentification requise.'], 401);
     }
 
-    return $text;
-}
-
-if (function_exists('is_user_logged_in') && !is_user_logged_in()) {
-    inventory_json_response([
-        'success' => false,
-        'message' => inventory_translate('Authentification requise.'),
-    ], 401);
-}
-
-global $pdo;
-
-if (!$pdo instanceof PDO) {
-    inventory_json_response([
-        'success' => false,
-        'message' => inventory_translate('Connexion à la base de données impossible.'),
-    ], 500);
-}
-
-$inventorySupportsIncomplete = ensure_incomplete_flag($pdo);
-
-$action = resolve_inventory_action($_REQUEST ?? []);
-
-try {
-    switch ($action) {
-        case 'add_product':
-            handle_add_product($pdo, $inventorySupportsIncomplete);
-            break;
-        case 'get_products':
-            handle_get_products($pdo, $inventorySupportsIncomplete);
-            break;
-        case 'delete_product':
-            handle_delete_product($pdo);
-            break;
-        case 'get_stats':
-            handle_get_stats($pdo);
-            break;
-        case 'update_product':
-            handle_update_product($pdo, $inventorySupportsIncomplete);
-            break;
-        default:
-            inventory_json_response([
-                'success' => false,
-                'message' => inventory_translate('Action non reconnue.'),
-            ], 400);
-    }
-} catch (PDOException $exception) {
-    inventory_json_response([
-        'success' => false,
-        'message' => inventory_translate('Erreur base de données : ') . $exception->getMessage(),
-    ], 500);
-}
-
-/**
- * Determine which handler should be executed for the provided action payload.
- */
-function resolve_inventory_action(array $request): string
-{
-    $value = extract_action_value($request);
-
-    if ($value === '') {
-        return '';
-    }
-
-    $normalised = normalise_action_name($value);
-
-    if ($normalised === '') {
-        return '';
-    }
-
-    $normalised = strip_action_prefixes($normalised);
-
-    if ($normalised === '') {
-        return '';
-    }
-
-    $aliases = [
-        'add_product' => 'add_product',
-        'create_product' => 'add_product',
-        'create' => 'add_product',
-        'add' => 'add_product',
-        'get_products' => 'get_products',
-        'list_products' => 'get_products',
-        'getproducts' => 'get_products',
-        'list' => 'get_products',
-        'fetch' => 'get_products',
-        'delete_product' => 'delete_product',
-        'delete' => 'delete_product',
-        'remove_product' => 'delete_product',
-        'remove' => 'delete_product',
-        'get_stats' => 'get_stats',
-        'stats' => 'get_stats',
-        'stats_get' => 'get_stats',
-        'update_product' => 'update_product',
-        'update' => 'update_product',
-        'edit_product' => 'update_product',
-        'edit' => 'update_product',
-    ];
-
-    if (isset($aliases[$normalised])) {
-        return $aliases[$normalised];
-    }
-
-    $allowed = [
-        'add_product',
-        'get_products',
-        'delete_product',
-        'get_stats',
-        'update_product',
-    ];
-
-    return in_array($normalised, $allowed, true) ? $normalised : '';
-}
-
-/**
- * Extract the raw action value from request globals or JSON bodies.
- */
-function extract_action_value(array $request): string
-{
-    $candidates = [
-        'action',
-        'Action',
-        'ACTION',
-        'inventory_action',
-        'inventoryAction',
-        'inventory-action',
-        'inventoryaction',
-        'action_inventory',
-        'actionInventory',
-        'action-inventory',
-    ];
-
-    foreach ($candidates as $key) {
-        if (isset($request[$key]) && $request[$key] !== '') {
-            return (string) $request[$key];
+    global $pdo;
+    if (!$pdo instanceof PDO) {
+        // Tentative de reconnexion si $pdo est null
+        require_once __DIR__ . '/db_connect.php';
+        if (!$pdo instanceof PDO) {
+            wp_send_json_error(['message' => 'Connexion DB impossible.'], 500);
         }
     }
 
-    $contentType = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
-    if (stripos($contentType, 'application/json') !== false) {
-        $rawInput = file_get_contents('php://input');
-        if ($rawInput !== false && $rawInput !== '') {
-            $decoded = json_decode($rawInput, true);
-            if (is_array($decoded)) {
-                foreach ($candidates as $key) {
-                    if (isset($decoded[$key]) && $decoded[$key] !== '') {
-                        return (string) $decoded[$key];
-                    }
-                }
-            }
-        }
-    }
-
-    return '';
+    return $pdo;
 }
 
 /**
- * Remove common prefixes that may wrap the action name.
+ * Récupère tous les produits pour affichage
  */
-function strip_action_prefixes(string $value): string
+function inventory_get_products_ajax(): void
 {
-    $prefixes = [
-        'inventory_action_',
-        'inventoryaction_',
-        'inventory_',
-        'inventory',
-        'action_',
-    ];
-
-    $updated = $value;
-    $changed = true;
-
-    while ($changed) {
-        $changed = false;
-        foreach ($prefixes as $prefix) {
-            if (strpos($updated, $prefix) === 0) {
-                $updated = substr($updated, strlen($prefix));
-                $changed = true;
-                break;
-            }
-        }
-    }
-
-    return $updated;
-}
-
-/**
- * Normalise various action formats (camelCase, kebab-case, spaced) to snake_case.
- */
-function normalise_action_name(string $value): string
-{
-    $value = trim($value);
-
-    if ($value === '') {
-        return '';
-    }
-
-    $value = preg_replace('/([a-z])([A-Z])/', '$1_$2', $value);
-    $value = strtolower(preg_replace('/[^a-z0-9]+/', '_', $value));
-
-    return trim((string) $value, '_');
-}
-
-/**
- * Ensure the produits table exposes the a_completer flag.
- */
-function ensure_incomplete_flag(PDO $pdo): bool
-{
+    $pdo = inventory_ajax_precheck();
     try {
-        $columnStmt = $pdo->query("SHOW COLUMNS FROM produits LIKE 'a_completer'");
-        if ($columnStmt !== false && $columnStmt->fetch()) {
-            return true;
-        }
+        $stmt = $pdo->query('SELECT * FROM produits ORDER BY id DESC');
+        // Assurer les bons types de données pour JavaScript
+        $products = array_map(static function (array $p): array {
+            $p['id'] = intval($p['id']);
+            $p['prix_achat'] = floatval($p['prix_achat'] ?? 0);
+            $p['prix_vente'] = floatval($p['prix_vente'] ?? 0);
+            $p['stock'] = intval($p['stock'] ?? 0);
+            $p['a_completer'] = intval($p['a_completer'] ?? 0);
+            $p['emplacement'] = strval($p['emplacement'] ?? '');
+            $p['notes'] = strval($p['notes'] ?? '');
+            $p['date_achat'] = $p['date_achat'] ?? null; // Garder null si absent
+            $p['image'] = $p['image'] ?? null; // S'assurer que l'image est présente ou null
+            return $p;
+        }, $stmt->fetchAll(PDO::FETCH_ASSOC));
 
-        $pdo->exec('ALTER TABLE produits ADD COLUMN a_completer TINYINT(1) NOT NULL DEFAULT 0');
-        return true;
-    } catch (PDOException $exception) {
-        return false;
+        wp_send_json_success($products);
+    } catch (PDOException $e) {
+        wp_send_json_error(['message' => 'Erreur DB (get): ' . $e->getMessage()], 500);
     }
 }
 
 /**
- * Normalise uploaded file data and move it to the uploads directory.
+ * Gère l'upload d'image via WordPress de manière sécurisée
  */
-function inventory_handle_upload(): ?string
+function inventory_handle_wp_upload(): ?string
 {
-    if (empty($_FILES['image']['name'])) {
-        return null;
+    if (empty($_FILES['image']['name']) || $_FILES['image']['error'] !== UPLOAD_ERR_OK) {
+        return null; // Pas d'image fournie ou erreur initiale
     }
 
     $file = $_FILES['image'];
 
-    if ($file['error'] !== UPLOAD_ERR_OK) {
-        inventory_json_response([
-            'success' => false,
-            'message' => inventory_translate("Erreur lors du téléchargement de l'image."),
-        ], 400);
+    // Vérification type MIME avec WordPress
+    $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    $file_info = wp_check_filetype_and_ext($file['tmp_name'], $file['name']);
+    if (empty($file_info['ext']) || empty($file_info['type']) || !in_array($file_info['type'], $allowed_types, true)) {
+        throw new Exception('Type de fichier non autorisé. Images acceptées : JPG, PNG, GIF, WebP.');
     }
 
-    $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    $mime = null;
-    if (class_exists('finfo')) {
-        $finfo = new finfo(FILEINFO_MIME_TYPE);
-        $mime = $finfo->file($file['tmp_name']);
-    } elseif (function_exists('mime_content_type')) {
-        $mime = mime_content_type($file['tmp_name']);
+    // Utiliser wp_handle_upload
+    if (!function_exists('wp_handle_upload')) {
+        require_once ABSPATH . 'wp-admin/includes/file.php';
     }
 
-    if ($mime === null || !in_array($mime, $allowedMimes, true)) {
-        inventory_json_response([
-            'success' => false,
-            'message' => inventory_translate("Format d'image non supporté."),
-        ], 415);
+    // Définir le répertoire cible dans 'uploads/inventory'
+    add_filter('upload_dir', 'inventory_set_upload_dir');
+    $upload_overrides = ['test_form' => false];
+    $movefile = wp_handle_upload($file, $upload_overrides);
+    remove_filter('upload_dir', 'inventory_set_upload_dir'); // Nettoyer le filtre après usage
+
+    if (isset($movefile['error'])) {
+        throw new Exception('Erreur Upload WordPress: ' . $movefile['error']);
     }
 
-    $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    $imageName = uniqid('inv_', true) . '.' . $extension;
-    $uploadDir = dirname(__FILE__) . '/../uploads/';
-
-    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
-        inventory_json_response([
-            'success' => false,
-            'message' => inventory_translate("Impossible de préparer le dossier d'upload."),
-        ], 500);
-    }
-
-    if (!move_uploaded_file($file['tmp_name'], $uploadDir . $imageName)) {
-        inventory_json_response([
-            'success' => false,
-            'message' => inventory_translate("Impossible de sauvegarder l'image."),
-        ], 500);
-    }
-
-    return $imageName;
+    // Retourner seulement le nom du fichier (il sera dans uploads/inventory/)
+    return basename($movefile['file']);
 }
 
 /**
- * Create a product.
+ * Modifie temporairement le répertoire d'upload pour WordPress
  */
-function handle_add_product(PDO $pdo, bool $supportsIncomplete): void
+function inventory_set_upload_dir(array $dirs): array
 {
-    $nom = trim((string) ($_POST['nom'] ?? ''));
-    $reference = trim((string) ($_POST['reference'] ?? ''));
-    $prixAchat = isset($_POST['prix_achat']) ? (float) $_POST['prix_achat'] : 0.0;
-    $prixVente = isset($_POST['prix_vente']) ? (float) $_POST['prix_vente'] : 0.0;
-    $stock = isset($_POST['stock']) ? max(0, (int) $_POST['stock']) : 0;
-    $emplacement = trim((string) ($_POST['emplacement'] ?? ''));
-    $notes = trim((string) ($_POST['notes'] ?? ''));
-    $dateAchat = trim((string) ($_POST['date_achat'] ?? ''));
-    $description = trim((string) ($_POST['description'] ?? ''));
-    $aCompleter = isset($_POST['a_completer']) && (int) $_POST['a_completer'] === 1 ? 1 : 0;
+    $subdir = '/inventory';
+    $dirs['subdir'] = $subdir;
+    $dirs['path'] = $dirs['basedir'] . $subdir;
+    $dirs['url'] = $dirs['baseurl'] . $subdir;
+    return $dirs;
+}
 
+/**
+ * Ajoute un produit (avec tous les champs de la DB)
+ */
+function inventory_add_product_ajax(): void
+{
+    $pdo = inventory_ajax_precheck();
+
+    // Validation des champs requis
+    $nom = isset($_POST['nom']) ? trim((string) $_POST['nom']) : '';
+    $reference = isset($_POST['reference']) ? trim((string) $_POST['reference']) : '';
     if ($nom === '' || $reference === '') {
-        inventory_json_response([
-            'success' => false,
-            'message' => inventory_translate('Merci de renseigner le nom et la référence.'),
-        ], 422);
+        wp_send_json_error(['message' => 'Le nom et la référence sont requis.'], 400);
     }
 
-    $imageName = inventory_handle_upload();
+    // Récupération de tous les champs
+    $prix_achat = isset($_POST['prix_achat']) ? floatval($_POST['prix_achat']) : 0;
+    $prix_vente = isset($_POST['prix_vente']) ? floatval($_POST['prix_vente']) : 0;
+    $stock = isset($_POST['stock']) ? intval($_POST['stock']) : 0;
+    $description = isset($_POST['description']) ? trim((string) $_POST['description']) : '';
+    $a_completer = (!empty($_POST['a_completer']) && (string) $_POST['a_completer'] === '1') ? 1 : 0;
+    $emplacement = isset($_POST['emplacement']) ? trim((string) $_POST['emplacement']) : null;
+    $notes = isset($_POST['notes']) ? trim((string) $_POST['notes']) : null;
+    $date_achat_input = isset($_POST['date_achat']) ? trim((string) $_POST['date_achat']) : null;
 
-    $ajoutePar = 'Système';
-    if (function_exists('wp_get_current_user')) {
-        $currentUser = wp_get_current_user();
-        if ($currentUser instanceof WP_User && $currentUser->exists()) {
-            $ajoutePar = $currentUser->display_name ?: $currentUser->user_login;
+    // Validation/Formatage de la date
+    $date_achat = null;
+    if ($date_achat_input && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_achat_input)) {
+        $d = DateTime::createFromFormat('Y-m-d', $date_achat_input);
+        if ($d instanceof DateTime && $d->format('Y-m-d') === $date_achat_input) {
+            $date_achat = $date_achat_input;
         }
     }
 
-    $query = 'INSERT INTO produits (nom, reference, prix_achat, prix_vente, stock, description, image, ajoute_par';
-    $values = 'VALUES (:nom, :reference, :prix_achat, :prix_vente, :stock, :description, :image, :ajoute_par';
+    // Gestion de l'upload
+    $image_filename = null;
+    try {
+        $image_filename = inventory_handle_wp_upload();
+    } catch (Exception $e) {
+        wp_send_json_error(['message' => 'Erreur Upload: ' . $e->getMessage()], 500);
+    }
+
+    $current_user = wp_get_current_user();
+    $ajoute_par = $current_user->display_name ?: $current_user->user_login;
+
+    // SQL INSERT avec toutes les colonnes
+    $sql = 'INSERT INTO produits
+                (nom, reference, emplacement, prix_achat, prix_vente, stock, description, notes, date_achat, a_completer, ajoute_par, image)
+            VALUES
+                (:nom, :reference, :emplacement, :prix_achat, :prix_vente, :stock, :description, :notes, :date_achat, :a_completer, :ajoute_par, :image)';
+
     $params = [
         ':nom' => $nom,
         ':reference' => $reference,
-        ':prix_achat' => $prixAchat,
-        ':prix_vente' => $prixVente,
+        ':emplacement' => $emplacement,
+        ':prix_achat' => $prix_achat,
+        ':prix_vente' => $prix_vente,
         ':stock' => $stock,
         ':description' => $description,
-        ':image' => $imageName,
-        ':ajoute_par' => $ajoutePar,
+        ':notes' => $notes,
+        ':date_achat' => $date_achat,
+        ':a_completer' => $a_completer,
+        ':ajoute_par' => $ajoute_par,
+        ':image' => $image_filename,
     ];
 
-    $optionalColumns = [
-        'emplacement' => $emplacement,
-        'notes' => $notes,
-        'date_achat' => $dateAchat !== '' ? $dateAchat : null,
-    ];
-
-    $availableColumns = inventory_get_table_columns($pdo);
-
-    foreach ($optionalColumns as $column => $value) {
-        if (in_array($column, $availableColumns, true)) {
-            $query .= ', ' . $column;
-            $values .= ', :' . $column;
-            $params[':' . $column] = $value === '' ? null : $value;
-        }
+    try {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        wp_send_json_success(['message' => 'Produit ajouté avec succès.', 'id' => $pdo->lastInsertId()]);
+    } catch (PDOException $e) {
+        wp_send_json_error(['message' => 'Erreur DB (add): ' . $e->getMessage()], 500);
     }
-
-    if ($supportsIncomplete) {
-        $query .= ', a_completer';
-        $values .= ', :a_completer';
-        $params[':a_completer'] = $aCompleter;
-    }
-
-    $query .= ') ' . $values . ')';
-
-    $stmt = $pdo->prepare($query);
-    $stmt->execute($params);
-
-    inventory_json_response([
-        'success' => true,
-        'message' => inventory_translate('Produit ajouté avec succès.'),
-    ]);
 }
 
 /**
- * Retrieve the list of columns available on the produits table.
+ * Met à jour un champ spécifique d'un produit
  */
-function inventory_get_table_columns(PDO $pdo): array
+function inventory_update_product_ajax(): void
 {
-    $columns = [];
-    $stmt = $pdo->query('SHOW COLUMNS FROM produits');
+    $pdo = inventory_ajax_precheck();
 
-    if ($stmt !== false) {
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            if (isset($row['Field'])) {
-                $columns[] = $row['Field'];
+    $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
+    $field = isset($_POST['field']) ? (string) $_POST['field'] : '';
+    $value = isset($_POST['value']) ? $_POST['value'] : '';
+
+    // Champs autorisés à la modification directe
+    $allowed_fields = ['prix_achat', 'prix_vente', 'stock', 'a_completer', 'emplacement', 'notes', 'date_achat', 'description'];
+    if ($id <= 0 || !in_array($field, $allowed_fields, true)) {
+        wp_send_json_error(['message' => 'Données de mise à jour invalides (champ non autorisé ou ID manquant).'], 400);
+    }
+
+    // Nettoyage/Validation de la valeur en fonction du champ
+    if ($field === 'prix_achat' || $field === 'prix_vente') {
+        $value = preg_replace('/[^\d,\.]/', '', str_replace(',', '.', (string) $value));
+        $value = floatval($value);
+    } elseif ($field === 'stock') {
+        $value = intval(preg_replace('/[^\d]/', '', (string) $value));
+        $value = max(0, $value);
+    } elseif ($field === 'a_completer') {
+        $value = (($value === '1') || ($value === 1) || ($value === true) || ($value === 'true')) ? 1 : 0;
+    } elseif ($field === 'date_achat') {
+        $value = trim((string) $value);
+        if ($value !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            $d = DateTime::createFromFormat('Y-m-d', $value);
+            if (!$d instanceof DateTime || $d->format('Y-m-d') !== $value) {
+                $value = null;
             }
+        } elseif ($value === '') {
+            $value = null; // Permettre de vider la date
+        } else {
+            wp_send_json_error(['message' => 'Format de date invalide (AAAA-MM-JJ requis).'], 400);
+        }
+    } else {
+        // Pour les champs texte comme 'emplacement', 'notes', 'description'
+        $value = trim(wp_kses_post((string) $value));
+        if ($value === '') {
+            $value = null;
         }
     }
 
-    return $columns;
-}
+    // Utiliser des backticks pour protéger le nom de colonne
+    $sql = 'UPDATE produits SET `' . $field . '` = :value WHERE id = :id';
 
-/**
- * Fetch every product for the table view.
- */
-function handle_get_products(PDO $pdo, bool $supportsIncomplete): void
-{
-    $stmt = $pdo->query('SELECT * FROM produits ORDER BY id DESC');
-    $products = [];
-
-    while ($row = $stmt->fetch()) {
-        $row['prix_achat'] = isset($row['prix_achat']) ? (float) $row['prix_achat'] : 0.0;
-        $row['prix_vente'] = isset($row['prix_vente']) ? (float) $row['prix_vente'] : 0.0;
-        $row['stock'] = isset($row['stock']) ? (int) $row['stock'] : 0;
-        $row['a_completer'] = $supportsIncomplete && array_key_exists('a_completer', $row)
-            ? (int) $row['a_completer']
-            : 0;
-        $products[] = $row;
+    try {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':value' => $value, ':id' => $id]);
+        wp_send_json_success(['message' => 'Produit mis à jour.', 'newValue' => $value]);
+    } catch (PDOException $e) {
+        wp_send_json_error(['message' => 'Erreur DB (update): ' . $e->getMessage()], 500);
     }
-
-    inventory_json_response([
-        'success' => true,
-        'data' => $products,
-    ]);
 }
 
 /**
- * Delete a single product.
+ * Supprime un produit et son image associée
  */
-function handle_delete_product(PDO $pdo): void
+function inventory_delete_product_ajax(): void
 {
-    $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+    $pdo = inventory_ajax_precheck();
+    $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
 
     if ($id <= 0) {
-        inventory_json_response([
-            'success' => false,
-            'message' => inventory_translate('Identifiant invalide.'),
-        ], 422);
+        wp_send_json_error(['message' => 'ID invalide.'], 400);
     }
 
-    $stmt = $pdo->prepare('DELETE FROM produits WHERE id = :id');
-    $stmt->execute([':id' => $id]);
-
-    inventory_json_response([
-        'success' => true,
-        'message' => inventory_translate('Produit supprimé.'),
-    ]);
-}
-
-/**
- * Aggregate stats for the hero counters.
- */
-function handle_get_stats(PDO $pdo): void
-{
-    $stmt = $pdo->query('SELECT COALESCE(SUM(stock), 0) AS total_stock, COALESCE(SUM(prix_achat * stock), 0) AS total_achat, COALESCE(SUM(prix_vente * stock), 0) AS total_vente FROM produits');
-    $result = $stmt->fetch() ?: [];
-
-    $totalAchat = (float) ($result['total_achat'] ?? 0);
-    $totalVente = (float) ($result['total_vente'] ?? 0);
-
-    inventory_json_response([
-        'success' => true,
-        'data' => [
-            'total_articles' => (int) ($result['total_stock'] ?? 0),
-            'valeur_achat' => $totalAchat,
-            'valeur_vente' => $totalVente,
-            'marge_totale' => $totalVente - $totalAchat,
-        ],
-    ]);
-}
-
-/**
- * Update a single field on a product.
- */
-function handle_update_product(PDO $pdo, bool $supportsIncomplete): void
-{
-    $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
-    $field = isset($_POST['field']) ? (string) $_POST['field'] : '';
-    $value = $_POST['value'] ?? null;
-
-    $allowedFields = [
-        'prix_achat' => 'float',
-        'prix_vente' => 'float',
-        'stock' => 'int',
-    ];
-
-    if ($supportsIncomplete) {
-        $allowedFields['a_completer'] = 'int';
+    // 1. Récupérer le nom de l'image avant de supprimer l'entrée de la DB
+    $image_to_delete = null;
+    try {
+        $stmt = $pdo->prepare('SELECT image FROM produits WHERE id = :id');
+        $stmt->execute([':id' => $id]);
+        $image_to_delete = $stmt->fetchColumn() ?: null;
+    } catch (PDOException $e) {
+        error_log('Inventory - Erreur récupération image avant suppression (ID: ' . $id . '): ' . $e->getMessage());
     }
 
-    if ($id <= 0 || !isset($allowedFields[$field])) {
-        inventory_json_response([
-            'success' => false,
-            'message' => inventory_translate('Paramètres invalides.'),
-        ], 422);
-    }
+    // 2. Supprimer l'entrée de la base de données
+    $sql = 'DELETE FROM produits WHERE id = :id';
+    try {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':id' => $id]);
 
-    switch ($allowedFields[$field]) {
-        case 'float':
-            $value = max(0, (float) $value);
-            break;
-        case 'int':
-            $value = max(0, (int) $value);
-            if ($field === 'a_completer') {
-                $value = $value === 1 ? 1 : 0;
+        // 3. Si la suppression DB a réussi ET qu'on a un nom d'image, supprimer le fichier
+        if ($image_to_delete) {
+            $upload_dir_info = wp_upload_dir();
+            // Le chemin de base est wp-content/uploads/inventory/
+            $file_path = $upload_dir_info['basedir'] . '/inventory/' . $image_to_delete;
+            if (file_exists($file_path)) {
+                if (!unlink($file_path)) {
+                    error_log('Inventory - Impossible de supprimer le fichier image: ' . $file_path);
+                } else {
+                    error_log('Inventory - Fichier image supprimé: ' . $file_path);
+                }
+            } else {
+                error_log('Inventory - Fichier image non trouvé pour suppression: ' . $file_path);
             }
-            break;
+        }
+
+        wp_send_json_success(['message' => 'Produit supprimé.']);
+    } catch (PDOException $e) {
+        wp_send_json_error(['message' => 'Erreur DB (delete): ' . $e->getMessage()], 500);
     }
-
-    $stmt = $pdo->prepare("UPDATE produits SET {$field} = :value WHERE id = :id");
-    $stmt->execute([
-        ':value' => $value,
-        ':id' => $id,
-    ]);
-
-    inventory_json_response([
-        'success' => true,
-        'message' => inventory_translate('Produit mis à jour.'),
-    ]);
 }
