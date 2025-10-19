@@ -5,6 +5,7 @@
     --primary-light: #f9f0f3;
     --primary-dark: #b87c8f;
     --secondary: #10b981;
+    --secondary-dark: #0b7a64;
     --secondary-light: #d1fae5;
     --accent: #f59e0b;
     --background: #fefaf9;
@@ -31,6 +32,7 @@ body.inventory-dark {
     --primary-light: #3a252a;
     --primary-dark: #e8c3ce;
     --secondary: #34d399;
+    --secondary-dark: #0f766e;
     --secondary-light: #065f46;
     --accent: #fbbf24;
     --background: #1a1014;
@@ -398,15 +400,21 @@ button,
 
 button.primary,
 .primary {
-    background: linear-gradient(135deg, #ec4899, #db2777 45%, #f97316 100%);
+    background: linear-gradient(135deg, var(--secondary), var(--secondary-dark));
     color: #fff;
-    box-shadow: 0 18px 36px -18px rgba(236, 72, 153, 0.55);
+    box-shadow: 0 20px 40px -18px rgba(16, 185, 129, 0.55);
 }
 
 button.primary:hover,
 .primary:hover {
     transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 28px 48px -20px rgba(15, 118, 110, 0.45);
+}
+
+button.primary:focus-visible,
+.primary:focus-visible {
+    outline: 3px solid rgba(16, 185, 129, 0.4);
+    outline-offset: 2px;
 }
 
 button.secondary,

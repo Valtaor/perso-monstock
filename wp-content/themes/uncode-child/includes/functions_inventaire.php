@@ -11,6 +11,36 @@ if (!defined('ABSPATH')) {
 
 require_once __DIR__ . '/db_connect.php';
 
+/**
+ * Retourne la liste des colonnes disponibles dans la table produits.
+ *
+ * @return array<string, bool>
+ */
+function inventory_get_table_columns(PDO $pdo): array
+{
+    static $cache = null;
+
+    if (is_array($cache)) {
+        return $cache;
+    }
+
+    $cache = [];
+
+    try {
+        $stmt = $pdo->query('SHOW COLUMNS FROM produits');
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $column) {
+            if (!empty($column['Field'])) {
+                $cache[$column['Field']] = true;
+            }
+        }
+    } catch (PDOException $e) {
+        error_log('Inventory - Impossible de récupérer les colonnes de la table produits : ' . $e->getMessage());
+        $cache = [];
+    }
+
+    return $cache;
+}
+
 // --- Enregistrement des actions AJAX WordPress ---
 add_action('wp_ajax_get_products', 'inventory_get_products_ajax');
 add_action('wp_ajax_add_product', 'inventory_add_product_ajax');
@@ -71,7 +101,11 @@ function inventory_get_products_ajax(): void
  */
 function inventory_handle_wp_upload(): ?string
 {
-    if (empty($_FILES['image']['name']) || $_FILES['image']['error'] !== UPLOAD_ERR_OK) {
+    if (!isset($_FILES['image']) || !is_array($_FILES['image'])) {
+        return null;
+    }
+
+    if (empty($_FILES['image']['name']) || (int) $_FILES['image']['error'] !== UPLOAD_ERR_OK) {
         return null; // Pas d'image fournie ou erreur initiale
     }
 
@@ -159,26 +193,47 @@ function inventory_add_product_ajax(): void
     $current_user = wp_get_current_user();
     $ajoute_par = $current_user->display_name ?: $current_user->user_login;
 
-    // SQL INSERT avec toutes les colonnes
-    $sql = 'INSERT INTO produits
-                (nom, reference, emplacement, prix_achat, prix_vente, stock, description, notes, date_achat, a_completer, ajoute_par, image)
-            VALUES
-                (:nom, :reference, :emplacement, :prix_achat, :prix_vente, :stock, :description, :notes, :date_achat, :a_completer, :ajoute_par, :image)';
+    $columns = inventory_get_table_columns($pdo);
 
-    $params = [
-        ':nom' => $nom,
-        ':reference' => $reference,
-        ':emplacement' => $emplacement,
-        ':prix_achat' => $prix_achat,
-        ':prix_vente' => $prix_vente,
-        ':stock' => $stock,
-        ':description' => $description,
-        ':notes' => $notes,
-        ':date_achat' => $date_achat,
-        ':a_completer' => $a_completer,
-        ':ajoute_par' => $ajoute_par,
-        ':image' => $image_filename,
+    $columnMap = [
+        'nom' => $nom,
+        'reference' => $reference,
+        'emplacement' => $emplacement,
+        'prix_achat' => $prix_achat,
+        'prix_vente' => $prix_vente,
+        'stock' => $stock,
+        'description' => $description,
+        'notes' => $notes,
+        'date_achat' => $date_achat,
+        'a_completer' => $a_completer,
+        'ajoute_par' => $ajoute_par,
+        'image' => $image_filename,
     ];
+
+    $insertColumns = [];
+    $placeholders = [];
+    $params = [];
+
+    foreach ($columnMap as $columnName => $value) {
+        if (!array_key_exists($columnName, $columns)) {
+            continue;
+        }
+
+        $insertColumns[] = '`' . $columnName . '`';
+        $placeholder = ':' . $columnName;
+        $placeholders[] = $placeholder;
+        $params[$placeholder] = $value;
+    }
+
+    if (!in_array('`nom`', $insertColumns, true) || !in_array('`reference`', $insertColumns, true)) {
+        wp_send_json_error(['message' => 'Colonnes obligatoires manquantes dans la table produits.'], 500);
+    }
+
+    $sql = sprintf(
+        'INSERT INTO produits (%s) VALUES (%s)',
+        implode(', ', $insertColumns),
+        implode(', ', $placeholders)
+    );
 
     try {
         $stmt = $pdo->prepare($sql);
@@ -201,7 +256,12 @@ function inventory_update_product_ajax(): void
     $value = isset($_POST['value']) ? $_POST['value'] : '';
 
     // Champs autorisés à la modification directe
+    $columns = inventory_get_table_columns($pdo);
     $allowed_fields = ['prix_achat', 'prix_vente', 'stock', 'a_completer', 'emplacement', 'notes', 'date_achat', 'description'];
+    $allowed_fields = array_values(array_filter($allowed_fields, static function (string $column) use ($columns): bool {
+        return array_key_exists($column, $columns);
+    }));
+
     if ($id <= 0 || !in_array($field, $allowed_fields, true)) {
         wp_send_json_error(['message' => 'Données de mise à jour invalides (champ non autorisé ou ID manquant).'], 400);
     }
@@ -259,14 +319,17 @@ function inventory_delete_product_ajax(): void
         wp_send_json_error(['message' => 'ID invalide.'], 400);
     }
 
-    // 1. Récupérer le nom de l'image avant de supprimer l'entrée de la DB
+    // 1. Récupérer le nom de l'image avant de supprimer l'entrée de la DB si la colonne existe
+    $columns = inventory_get_table_columns($pdo);
     $image_to_delete = null;
-    try {
-        $stmt = $pdo->prepare('SELECT image FROM produits WHERE id = :id');
-        $stmt->execute([':id' => $id]);
-        $image_to_delete = $stmt->fetchColumn() ?: null;
-    } catch (PDOException $e) {
-        error_log('Inventory - Erreur récupération image avant suppression (ID: ' . $id . '): ' . $e->getMessage());
+    if (array_key_exists('image', $columns)) {
+        try {
+            $stmt = $pdo->prepare('SELECT image FROM produits WHERE id = :id');
+            $stmt->execute([':id' => $id]);
+            $image_to_delete = $stmt->fetchColumn() ?: null;
+        } catch (PDOException $e) {
+            error_log('Inventory - Erreur récupération image avant suppression (ID: ' . $id . '): ' . $e->getMessage());
+        }
     }
 
     // 2. Supprimer l'entrée de la base de données
