@@ -93,20 +93,7 @@ try {
  */
 function resolve_inventory_action(array $request): string
 {
-    $candidates = [
-        'action',
-        'inventory_action',
-        'inventoryAction',
-        'inventory-action',
-    ];
-
-    $value = '';
-    foreach ($candidates as $key) {
-        if (isset($request[$key]) && $request[$key] !== '') {
-            $value = (string) $request[$key];
-            break;
-        }
-    }
+    $value = extract_action_value($request);
 
     if ($value === '') {
         return '';
@@ -118,10 +105,10 @@ function resolve_inventory_action(array $request): string
         return '';
     }
 
-    if (strpos($normalised, 'inventory_') === 0) {
-        $normalised = substr($normalised, 10);
-    } elseif (strpos($normalised, 'inventory') === 0) {
-        $normalised = substr($normalised, 9);
+    $normalised = strip_action_prefixes($normalised);
+
+    if ($normalised === '') {
+        return '';
     }
 
     $aliases = [
@@ -147,7 +134,91 @@ function resolve_inventory_action(array $request): string
         'edit' => 'update_product',
     ];
 
-    return $aliases[$normalised] ?? '';
+    if (isset($aliases[$normalised])) {
+        return $aliases[$normalised];
+    }
+
+    $allowed = [
+        'add_product',
+        'get_products',
+        'delete_product',
+        'get_stats',
+        'update_product',
+    ];
+
+    return in_array($normalised, $allowed, true) ? $normalised : '';
+}
+
+/**
+ * Extract the raw action value from request globals or JSON bodies.
+ */
+function extract_action_value(array $request): string
+{
+    $candidates = [
+        'action',
+        'Action',
+        'ACTION',
+        'inventory_action',
+        'inventoryAction',
+        'inventory-action',
+        'inventoryaction',
+        'action_inventory',
+        'actionInventory',
+        'action-inventory',
+    ];
+
+    foreach ($candidates as $key) {
+        if (isset($request[$key]) && $request[$key] !== '') {
+            return (string) $request[$key];
+        }
+    }
+
+    $contentType = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
+    if (stripos($contentType, 'application/json') !== false) {
+        $rawInput = file_get_contents('php://input');
+        if ($rawInput !== false && $rawInput !== '') {
+            $decoded = json_decode($rawInput, true);
+            if (is_array($decoded)) {
+                foreach ($candidates as $key) {
+                    if (isset($decoded[$key]) && $decoded[$key] !== '') {
+                        return (string) $decoded[$key];
+                    }
+                }
+            }
+        }
+    }
+
+    return '';
+}
+
+/**
+ * Remove common prefixes that may wrap the action name.
+ */
+function strip_action_prefixes(string $value): string
+{
+    $prefixes = [
+        'inventory_action_',
+        'inventoryaction_',
+        'inventory_',
+        'inventory',
+        'action_',
+    ];
+
+    $updated = $value;
+    $changed = true;
+
+    while ($changed) {
+        $changed = false;
+        foreach ($prefixes as $prefix) {
+            if (strpos($updated, $prefix) === 0) {
+                $updated = substr($updated, strlen($prefix));
+                $changed = true;
+                break;
+            }
+        }
+    }
+
+    return $updated;
 }
 
 /**
