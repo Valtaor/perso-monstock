@@ -56,26 +56,7 @@ if (!$pdo instanceof PDO) {
 
 $inventorySupportsIncomplete = ensure_incomplete_flag($pdo);
 
-$action = '';
-if (isset($_REQUEST['action'])) {
-    $action = (string) $_REQUEST['action'];
-} elseif (isset($_REQUEST['inventory_action'])) {
-    $action = (string) $_REQUEST['inventory_action'];
-}
-
-$action = strtolower(trim($action));
-
-$legacyMap = [
-    'inventory_add_product' => 'add_product',
-    'inventory_get_products' => 'get_products',
-    'inventory_delete_product' => 'delete_product',
-    'inventory_get_stats' => 'get_stats',
-    'inventory_update_product' => 'update_product',
-];
-
-if (isset($legacyMap[$action])) {
-    $action = $legacyMap[$action];
-}
+$action = resolve_inventory_action($_REQUEST ?? []);
 
 try {
     switch ($action) {
@@ -105,6 +86,85 @@ try {
         'success' => false,
         'message' => inventory_translate('Erreur base de données : ') . $exception->getMessage(),
     ], 500);
+}
+
+/**
+ * Determine which handler should be executed for the provided action payload.
+ */
+function resolve_inventory_action(array $request): string
+{
+    $candidates = [
+        'action',
+        'inventory_action',
+        'inventoryAction',
+        'inventory-action',
+    ];
+
+    $value = '';
+    foreach ($candidates as $key) {
+        if (isset($request[$key]) && $request[$key] !== '') {
+            $value = (string) $request[$key];
+            break;
+        }
+    }
+
+    if ($value === '') {
+        return '';
+    }
+
+    $normalised = normalise_action_name($value);
+
+    if ($normalised === '') {
+        return '';
+    }
+
+    if (strpos($normalised, 'inventory_') === 0) {
+        $normalised = substr($normalised, 10);
+    } elseif (strpos($normalised, 'inventory') === 0) {
+        $normalised = substr($normalised, 9);
+    }
+
+    $aliases = [
+        'add_product' => 'add_product',
+        'create_product' => 'add_product',
+        'create' => 'add_product',
+        'add' => 'add_product',
+        'get_products' => 'get_products',
+        'list_products' => 'get_products',
+        'getproducts' => 'get_products',
+        'list' => 'get_products',
+        'fetch' => 'get_products',
+        'delete_product' => 'delete_product',
+        'delete' => 'delete_product',
+        'remove_product' => 'delete_product',
+        'remove' => 'delete_product',
+        'get_stats' => 'get_stats',
+        'stats' => 'get_stats',
+        'stats_get' => 'get_stats',
+        'update_product' => 'update_product',
+        'update' => 'update_product',
+        'edit_product' => 'update_product',
+        'edit' => 'update_product',
+    ];
+
+    return $aliases[$normalised] ?? '';
+}
+
+/**
+ * Normalise various action formats (camelCase, kebab-case, spaced) to snake_case.
+ */
+function normalise_action_name(string $value): string
+{
+    $value = trim($value);
+
+    if ($value === '') {
+        return '';
+    }
+
+    $value = preg_replace('/([a-z])([A-Z])/', '$1_$2', $value);
+    $value = strtolower(preg_replace('/[^a-z0-9]+/', '_', $value));
+
+    return trim((string) $value, '_');
 }
 
 /**
