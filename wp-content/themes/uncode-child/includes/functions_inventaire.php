@@ -59,6 +59,86 @@ add_action('wp_ajax_update_product', 'inventory_update_product_ajax');
 add_action('wp_ajax_delete_product', 'inventory_delete_product_ajax');
 
 /**
+ * Détermine si une exception PDO provient d'une perte de connexion.
+ */
+function inventory_is_connection_error(PDOException $exception): bool
+{
+    $sqlState = (string) $exception->getCode();
+    $connectionStates = ['08S01', '08004', '08006', '08003', '08007'];
+    if (in_array($sqlState, $connectionStates, true)) {
+        return true;
+    }
+
+    $errorInfo = [];
+    if (property_exists($exception, 'errorInfo') && is_array($exception->errorInfo)) {
+        $errorInfo = $exception->errorInfo;
+    }
+
+    if (!empty($errorInfo[1])) {
+        $driverCode = (int) $errorInfo[1];
+        $connectionCodes = [1040, 1042, 1043, 1047, 2002, 2006, 2013];
+        if (in_array($driverCode, $connectionCodes, true)) {
+            return true;
+        }
+    }
+
+    $message = strtolower($exception->getMessage());
+    $needles = [
+        'server has gone away',
+        'lost connection',
+        'no connection',
+        'connection refused',
+        'server shutdown',
+        "can't connect to mysql server",
+        'connection timed out',
+        'reading initial communication packet',
+    ];
+
+    foreach ($needles as $needle) {
+        if (strpos($message, $needle) !== false) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Exécute une opération SQL en réessayant automatiquement après reconnexion.
+ *
+ * @template T
+ * @param callable(PDO):T $callback
+ * @return T
+ */
+function inventory_run_with_reconnect(callable $callback)
+{
+    $pdo = inventory_ajax_precheck();
+
+    try {
+        return $callback($pdo);
+    } catch (PDOException $exception) {
+        if (!inventory_is_connection_error($exception)) {
+            throw $exception;
+        }
+
+        $pdo = inventory_db_get_pdo(true);
+        if (!$pdo instanceof PDO) {
+            throw $exception;
+        }
+
+        inventory_reset_table_columns_cache();
+
+        return $callback($pdo);
+    }
+}
+
+// --- Enregistrement des actions AJAX WordPress ---
+add_action('wp_ajax_get_products', 'inventory_get_products_ajax');
+add_action('wp_ajax_add_product', 'inventory_add_product_ajax');
+add_action('wp_ajax_update_product', 'inventory_update_product_ajax');
+add_action('wp_ajax_delete_product', 'inventory_delete_product_ajax');
+
+/**
  * Vérification préliminaire (Login + DB) pour chaque appel AJAX
  */
 function inventory_ajax_precheck(): PDO
@@ -351,50 +431,45 @@ function inventory_update_product_ajax(): void
  */
 function inventory_delete_product_ajax(): void
 {
-    $pdo = inventory_ajax_precheck();
     $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
 
     if ($id <= 0) {
         wp_send_json_error(['message' => 'ID invalide.'], 400);
     }
 
-    // 1. Récupérer le nom de l'image avant de supprimer l'entrée de la DB si la colonne existe
-    $columns = inventory_get_table_columns($pdo);
-    $image_to_delete = null;
-    if (array_key_exists('image', $columns)) {
-        try {
-            $stmt = $pdo->prepare('SELECT image FROM produits WHERE id = :id');
-            $stmt->execute([':id' => $id]);
-            $image_to_delete = $stmt->fetchColumn() ?: null;
-        } catch (PDOException $e) {
-            error_log('Inventory - Erreur récupération image avant suppression (ID: ' . $id . '): ' . $e->getMessage());
-        }
-    }
-
-    // 2. Supprimer l'entrée de la base de données
-    $sql = 'DELETE FROM produits WHERE id = :id';
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([':id' => $id]);
+        $image_to_delete = inventory_run_with_reconnect(static function (PDO $pdo) use ($id): ?string {
+            $columns = inventory_get_table_columns($pdo);
+            $imageName = null;
 
-        // 3. Si la suppression DB a réussi ET qu'on a un nom d'image, supprimer le fichier
-        if ($image_to_delete) {
-            $upload_dir_info = wp_upload_dir();
-            // Le chemin de base est wp-content/uploads/inventory/
-            $file_path = $upload_dir_info['basedir'] . '/inventory/' . $image_to_delete;
-            if (file_exists($file_path)) {
-                if (!unlink($file_path)) {
-                    error_log('Inventory - Impossible de supprimer le fichier image: ' . $file_path);
-                } else {
-                    error_log('Inventory - Fichier image supprimé: ' . $file_path);
-                }
-            } else {
-                error_log('Inventory - Fichier image non trouvé pour suppression: ' . $file_path);
+            if (isset($columns['image'])) {
+                $stmt = $pdo->prepare('SELECT image FROM produits WHERE id = :id');
+                $stmt->execute([':id' => $id]);
+                $imageName = $stmt->fetchColumn() ?: null;
             }
-        }
 
-        wp_send_json_success(['message' => 'Produit supprimé.']);
+            $stmt = $pdo->prepare('DELETE FROM produits WHERE id = :id');
+            $stmt->execute([':id' => $id]);
+
+            return $imageName;
+        });
     } catch (PDOException $e) {
         wp_send_json_error(['message' => 'Erreur DB (delete): ' . $e->getMessage()], 500);
     }
+
+    if (!empty($image_to_delete)) {
+        $upload_dir_info = wp_upload_dir();
+        $file_path = rtrim($upload_dir_info['basedir'], '/\\') . '/inventory/' . $image_to_delete;
+        if (file_exists($file_path)) {
+            if (!unlink($file_path)) {
+                error_log('Inventory - Impossible de supprimer le fichier image: ' . $file_path);
+            } else {
+                error_log('Inventory - Fichier image supprimé: ' . $file_path);
+            }
+        } else {
+            error_log('Inventory - Fichier image non trouvé pour suppression: ' . $file_path);
+        }
+    }
+
+    wp_send_json_success(['message' => 'Produit supprimé.']);
 }
