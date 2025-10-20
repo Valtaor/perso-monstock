@@ -1,14 +1,59 @@
-jQuery(document).ready(function ($) {
-    const ajaxUrl = inventorySettings.ajaxUrl;
-    const uploadsUrl = inventorySettings.uploadsUrl;
+jQuery(function ($) {
+    const settings = window.inventorySettings || {};
+    const ajaxUrl = settings.ajaxUrl || window.ajaxurl || '';
+    const uploadsUrl = settings.uploadsUrl || '';
+    const i18n = settings.i18n || {};
 
+    const $body = $('body');
+    const $form = $('#inventory-form');
     const $tableBody = $('#inventory-table-body');
-    const $statsTotalArticles = $('#stat-total-articles');
-    const $statsValeurAchat = $('#stat-valeur-achat');
-    const $statsValeurVente = $('#stat-valeur-vente');
-    const $statsMargeTotale = $('#stat-marge-totale');
+    const $emptyState = $('#empty-state');
     const $searchInput = $('#inventory-search');
+    const $filterCasier = $('#filterCasier');
+    const $filterStatus = $('#filterStatus');
+    const $quickFilters = $('.quick-filter-btn');
+    const $toggleFilters = $('#toggleFilters');
+    const $exportCsv = $('#export-csv');
     const $toastContainer = $('.inventory-toast-stack');
+    const $themeToggle = $('#themeToggle');
+    const $photoInput = $('#product-image');
+    const $photoPreview = $('#image-preview');
+    const $photoPreviewContainer = $('#photoPreviewContainer');
+    const $cancelEdit = $('#cancel-edit');
+    const $submitButton = $('#submit-button');
+    const $formSection = $('.form-section');
+    const $statsTotalArticles = $('#stat-total-articles');
+    const $statsOutOfStock = $('#stat-out-of-stock');
+    const $statsValeurVente = $('#stat-valeur-vente');
+    const $statsValeurAchat = $('#stat-valeur-achat');
+    const $statsMargeTotale = $('#stat-marge-totale');
+    const $statLowStock = $('#stat-low-stock');
+    const $statAverageMargin = $('#stat-average-margin');
+    const $statIncomplete = $('#stat-incomplete');
+    const $mobileAddItem = $('#mobileAddItem');
+    const $mobileScrollInventory = $('#mobileScrollInventory');
+    const $mobileScrollStats = $('#mobileScrollStats');
+    const $statsCard = $('#statsCard');
+    const $inventoryCard = $('#inventoryCard');
+
+    let products = [];
+    let currentFilters = {
+        search: '',
+        casier: 'all',
+        status: 'all',
+    };
+
+    function syncQuickFilters(value) {
+        $quickFilters.attr('aria-pressed', 'false').removeClass('active');
+        $quickFilters.filter(`[data-status-filter="${value}"]`).attr('aria-pressed', 'true').addClass('active');
+    }
+
+    function t(key, fallback) {
+        if (Object.prototype.hasOwnProperty.call(i18n, key)) {
+            return i18n[key];
+        }
+        return fallback || key;
+    }
 
     function formatCurrency(value) {
         return Number(value || 0).toLocaleString('fr-FR', {
@@ -18,44 +63,25 @@ jQuery(document).ready(function ($) {
         });
     }
 
-    function buildRow(product) {
-        const imageCell = product.image
-            ? `<img src="${uploadsUrl}${product.image}" alt="${product.nom}" class="inventory-thumb">`
-            : '<div class="inventory-thumb placeholder">✨</div>';
-        const marge = (Number(product.prix_vente) - Number(product.prix_achat)).toFixed(2);
-
-        return `
-            <tr data-id="${product.id}">
-                <td class="cell-image">${imageCell}</td>
-                <td class="cell-title">
-                    <div class="item-name">${product.nom || ''}</div>
-                    <div class="item-reference">${product.reference || ''}</div>
-                </td>
-                <td class="cell-price inventory-editable" contenteditable="true" data-field="prix_achat">${Number(product.prix_achat).toFixed(2)}</td>
-                <td class="cell-price inventory-editable" contenteditable="true" data-field="prix_vente">${Number(product.prix_vente).toFixed(2)}</td>
-                <td class="cell-stock inventory-editable" contenteditable="true" data-field="stock">${parseInt(product.stock, 10)}</td>
-                <td class="cell-marge">${formatCurrency(marge)}</td>
-                <td class="cell-actions">
-                    <button class="btn-icon delete-product" title="Supprimer">✖</button>
-                </td>
-            </tr>
-        `;
+    function safeNumber(value) {
+        const number = parseFloat(value);
+        return Number.isFinite(number) ? number : 0;
     }
 
-    function showEmptyState() {
-        $tableBody.html(`
-            <tr class="empty-state">
-                <td colspan="7">
-                    <div class="empty-wrapper">
-                        <span class="empty-icon">💎</span>
-                        <p>Aucun bijou dans l'inventaire pour le moment.</p>
-                    </div>
-                </td>
-            </tr>
-        `);
+    function safeInteger(value) {
+        const number = parseInt(value, 10);
+        return Number.isFinite(number) ? number : 0;
+    }
+
+    function escapeHtml(value) {
+        return $('<div>').text(value == null ? '' : String(value)).html();
     }
 
     function showToast(message, type = 'success') {
+        if (!message) {
+            return;
+        }
+
         const toastId = `toast-${Date.now()}`;
         const $toast = $(`
             <div class="inventory-toast ${type}" id="${toastId}">
@@ -71,224 +97,536 @@ jQuery(document).ready(function ($) {
         setTimeout(() => {
             $toast.removeClass('visible');
             setTimeout(() => $toast.remove(), 300);
-        }, 3000);
+        }, 3600);
     }
 
-    function loadProducts() {
-        $.ajax({
-            url: ajaxUrl,
-            method: 'GET',
-            data: { action: 'get_products' },
-            dataType: 'json',
-        }).done((response) => {
-            if (response.success) {
-                if (!response.data || response.data.length === 0) {
-                    showEmptyState();
-                    return;
+    function loadTheme() {
+        const stored = window.localStorage.getItem('inventoryTheme');
+        if (stored === 'dark') {
+            $body.addClass('inventory-dark');
+        }
+    }
+
+    function toggleTheme() {
+        $body.toggleClass('inventory-dark');
+        window.localStorage.setItem('inventoryTheme', $body.hasClass('inventory-dark') ? 'dark' : 'light');
+    }
+
+    function renderPreview(file) {
+        if (!file) {
+            $photoPreview.attr('src', '').addClass('is-empty');
+            $photoPreviewContainer.removeClass('visible');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            $photoPreview.attr('src', event.target.result);
+            $photoPreview.removeClass('is-empty');
+            $photoPreviewContainer.addClass('visible');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function buildStatus(product) {
+        const stock = safeInteger(product.stock);
+        const isIncomplete = Number(product.a_completer) === 1;
+        if (stock <= 0) {
+            return { className: 'rupture', label: t('statusOutOfStock', 'Rupture') };
+        }
+        if (isIncomplete) {
+            return { className: 'incomplet', label: t('statusIncomplete', 'À compléter') };
+        }
+        return { className: 'en-stock', label: t('statusInStock', 'En stock') };
+    }
+
+    function truncate(text, maxLength) {
+        const value = text || '';
+        if (value.length <= maxLength) {
+            return value;
+        }
+        return `${value.slice(0, maxLength - 1)}…`;
+    }
+
+    function buildRow(product) {
+        const stock = safeInteger(product.stock);
+        const prixAchat = safeNumber(product.prix_achat);
+        const prixVente = safeNumber(product.prix_vente);
+        const marge = prixVente - prixAchat;
+        const status = buildStatus(product);
+        const isIncomplete = Number(product.a_completer) === 1;
+        const safeName = escapeHtml(product.nom || '');
+        const imageCell = product.image
+            ? `<img src="${uploadsUrl}${product.image}" alt="${safeName}" class="inventory-thumb">`
+            : '<div class="inventory-thumb placeholder" aria-hidden="true">💎</div>';
+
+        const notes = escapeHtml(product.notes);
+        const description = escapeHtml(product.description);
+        const reference = escapeHtml(product.reference);
+        const emplacement = escapeHtml(product.emplacement);
+        const dateAchat = escapeHtml(product.date_achat);
+
+        const truncatedNotes = escapeHtml(truncate(product.notes || '', 32));
+        const truncatedDescription = escapeHtml(truncate(product.description || '', 32));
+
+        const suiviBadges = [];
+        if (isIncomplete) {
+            suiviBadges.push('<span class="badge-later">⏳ ' + t('statusIncomplete', 'À compléter') + '</span>');
+        }
+        if (notes) {
+            suiviBadges.push(`<span class="tag-chip" title="${notes}">📝 ${truncatedNotes}</span>`);
+        }
+        if (description) {
+            suiviBadges.push(`<span class="tag-chip" title="${description}">📌 ${truncatedDescription}</span>`);
+        }
+
+        return `
+            <tr
+                data-id="${product.id}"
+                data-casier="${emplacement}"
+                data-status="${status.className}"
+                data-incomplete="${isIncomplete ? '1' : '0'}"
+            >
+                <td data-label="${t('columnPhoto', 'Photo')}">${imageCell}</td>
+                <td data-label="${t('columnTitle', 'Titre')}">
+                    <div class="item-title">${safeName || '—'}</div>
+                    <div class="item-meta">
+                        ${reference ? `<span>Réf. ${reference}</span>` : ''}
+                        ${emplacement ? `<span>${t('columnCasier', 'Casier')} ${emplacement}</span>` : ''}
+                    </div>
+                </td>
+                <td data-label="${t('columnInfos', 'Infos')}">
+                    <div class="item-tags">
+                        <span class="tag-chip editable" contenteditable="true" data-field="prix_achat" data-type="float">${t('labelPurchase', 'Achat')} : ${prixAchat.toFixed(2)}</span>
+                        <span class="tag-chip editable" contenteditable="true" data-field="prix_vente" data-type="float">${t('labelSale', 'Vente')} : ${prixVente.toFixed(2)}</span>
+                        ${dateAchat ? `<span class="tag-chip">${t('labelDate', 'Acheté le')} ${dateAchat}</span>` : ''}
+                    </div>
+                </td>
+                <td data-label="${t('columnQuantity', 'Quantité')}">
+                    <span class="quantity-badge editable" contenteditable="true" data-field="stock" data-type="int">${stock}</span>
+                </td>
+                <td data-label="${t('columnFollowUp', 'Suivi')}">
+                    <div class="item-tags">
+                        ${suiviBadges.join('') || '<span class="tag-chip">—</span>'}
+                    </div>
+                </td>
+                <td data-label="${t('columnStatus', 'Statut')}">
+                    <span class="status ${status.className}">${status.label}</span>
+                    <div class="item-meta">${formatCurrency(marge)}</div>
+                </td>
+                <td data-label="${t('columnActions', 'Actions')}">
+                    <div class="actions-cell">
+                        <button type="button" class="toggle-incomplete" title="${isIncomplete ? t('toggleComplete', 'Marquer comme complet') : t('toggleIncomplete', 'Marquer comme à compléter')}">
+                            ${isIncomplete ? '☑️' : '⏳'}
+                        </button>
+                        <button type="button" class="delete-product" title="${t('deleteConfirm', 'Supprimer')}" aria-label="${t('deleteConfirm', 'Supprimer')}">
+                            ✖
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+
+    function refreshTable() {
+        let filtered = products.slice();
+        const query = currentFilters.search.trim().toLowerCase();
+
+        if (query) {
+            filtered = filtered.filter((product) => {
+                const text = [
+                    product.nom,
+                    product.reference,
+                    product.emplacement,
+                    product.notes,
+                    product.description,
+                    product.date_achat,
+                ]
+                    .join(' ')
+                    .toLowerCase();
+                return text.includes(query);
+            });
+        }
+
+        const selectedCasier = (currentFilters.casier || '').toLowerCase();
+        if (selectedCasier && selectedCasier !== 'all') {
+            filtered = filtered.filter((product) => (product.emplacement || '').toLowerCase() === selectedCasier);
+        }
+
+        if (currentFilters.status !== 'all') {
+            filtered = filtered.filter((product) => {
+                const status = buildStatus(product);
+                if (currentFilters.status === 'incomplet') {
+                    return Number(product.a_completer) === 1;
                 }
+                return status.className === currentFilters.status;
+            });
+        }
 
-                const rows = response.data.map((product) => buildRow(product)).join('');
-                $tableBody.html(rows);
-                updateSearchFilter();
-            }
-        }).fail(() => {
-            showToast('Impossible de charger les produits.', 'error');
-        });
+        $tableBody.empty();
+
+        if (filtered.length === 0) {
+            $emptyState.addClass('visible');
+            return;
+        }
+
+        const rows = filtered.map(buildRow).join('');
+        $tableBody.html(rows);
+        $emptyState.removeClass('visible');
+        bindRowEvents();
     }
 
-    function loadStats() {
-        $.ajax({
-            url: ajaxUrl,
-            method: 'GET',
-            data: { action: 'get_stats' },
-            dataType: 'json',
-        }).done((response) => {
-            if (response.success && response.data) {
-                $statsTotalArticles.text(response.data.total_articles);
-                $statsValeurAchat.text(formatCurrency(response.data.valeur_achat));
-                $statsValeurVente.text(formatCurrency(response.data.valeur_vente));
-                $statsMargeTotale.text(formatCurrency(response.data.marge_totale));
+    function updateCasierFilterOptions() {
+        const uniqueCasiers = new Set();
+        products.forEach((product) => {
+            if (product.emplacement) {
+                uniqueCasiers.add(product.emplacement);
             }
         });
+
+        const current = $filterCasier.val();
+        $filterCasier.empty();
+        $('<option>').val('all').text(t('filterAllCasiers', 'Tous les casiers')).appendTo($filterCasier);
+        Array.from(uniqueCasiers)
+            .sort((a, b) => a.localeCompare(b))
+            .forEach((casier) => {
+                $('<option>').val(casier).text(casier).appendTo($filterCasier);
+            });
+        if (current && current !== 'all') {
+            $filterCasier.val(current);
+        }
     }
 
-    function updateSearchFilter() {
-        const query = $searchInput.val()?.toLowerCase() || '';
-        $tableBody.find('tr').each(function () {
-            const $row = $(this);
-            if ($row.hasClass('empty-state')) {
+    function updateStatusFilterOptions() {
+        const current = $filterStatus.val();
+        $filterStatus.empty();
+        $filterStatus.append(`<option value="all">${t('filterAllStatus', 'Tous les statuts')}</option>`);
+        $filterStatus.append(`<option value="en-stock">${t('statusInStock', 'En stock')}</option>`);
+        $filterStatus.append(`<option value="rupture">${t('statusOutOfStock', 'Rupture')}</option>`);
+        $filterStatus.append(`<option value="incomplet">${t('statusIncomplete', 'À compléter')}</option>`);
+        if (current) {
+            $filterStatus.val(current);
+        }
+    }
+
+    function updateStats() {
+        let totalStock = 0;
+        let totalValeurAchat = 0;
+        let totalValeurVente = 0;
+        let lowStock = 0;
+        let outOfStock = 0;
+        let incomplete = 0;
+        let totalMargin = 0;
+        let marginCount = 0;
+
+        products.forEach((product) => {
+            const stock = safeInteger(product.stock);
+            const prixAchat = safeNumber(product.prix_achat);
+            const prixVente = safeNumber(product.prix_vente);
+            totalStock += stock;
+            totalValeurAchat += prixAchat * stock;
+            totalValeurVente += prixVente * stock;
+            if (stock <= 0) {
+                outOfStock += 1;
+            } else if (stock <= 3) {
+                lowStock += 1;
+            }
+            if (Number(product.a_completer) === 1) {
+                incomplete += 1;
+            }
+            totalMargin += prixVente - prixAchat;
+            marginCount += 1;
+        });
+
+        $statsTotalArticles.text(totalStock);
+        $statsOutOfStock.text(outOfStock);
+        $statsValeurVente.text(formatCurrency(totalValeurVente));
+        $statsValeurAchat.text(formatCurrency(totalValeurAchat));
+        $statsMargeTotale.text(formatCurrency(totalValeurVente - totalValeurAchat));
+        $statLowStock.text(lowStock);
+        $statIncomplete.text(incomplete);
+        $statAverageMargin.text(formatCurrency(marginCount ? totalMargin / marginCount : 0));
+    }
+
+    function bindRowEvents() {
+        $tableBody.find('.toggle-incomplete').off('click').on('click', function () {
+            const $row = $(this).closest('tr');
+            const productId = safeInteger($row.data('id'));
+            const isIncomplete = Number($row.data('incomplete')) === 1;
+            const newValue = isIncomplete ? 0 : 1;
+            updateProductField(productId, 'a_completer', newValue, () => {
+                const product = products.find((item) => Number(item.id) === productId);
+                if (product) {
+                    product.a_completer = newValue;
+                    refreshTable();
+                    updateStats();
+                    showToast(newValue ? t('markedIncomplete', 'Objet marqué à compléter.') : t('markedComplete', 'Objet marqué complet.'));
+                }
+            });
+        });
+
+        $tableBody.find('.delete-product').off('click').on('click', function () {
+            const $row = $(this).closest('tr');
+            const productId = safeInteger($row.data('id'));
+            if (!window.confirm(t('deleteConfirm', 'Supprimer cet article ?'))) {
                 return;
             }
-            const text = $row.text().toLowerCase();
-            $row.toggle(text.includes(query));
+            $.ajax({
+                url: ajaxUrl,
+                method: 'POST',
+                dataType: 'json',
+                data: {
+                    action: 'delete_product',
+                    id: productId,
+                },
+            })
+                .done((response) => {
+                    if (response && response.success) {
+                        products = products.filter((item) => Number(item.id) !== productId);
+                        refreshTable();
+                        updateStats();
+                        showToast(t('toastDeleteSuccess', 'Produit supprimé.'), 'success');
+                    } else {
+                        showToast((response && response.message) || t('toastDeleteError', 'Suppression impossible.'), 'error');
+                    }
+                })
+                .fail(() => {
+                    showToast(t('toastDeleteError', 'Suppression impossible.'), 'error');
+                });
+        });
+
+        $tableBody.find('.editable').off('focus').on('focus', function () {
+            const $this = $(this);
+            $this.data('original', $this.text().trim());
+        });
+
+        $tableBody.find('.editable').off('blur').on('blur', function () {
+            const $this = $(this);
+            const original = $this.data('original');
+            let value = $this.text().trim().replace(/[^0-9,\.\-]/g, '').replace(',', '.');
+            if (value === original) {
+                return;
+            }
+            const field = $this.data('field');
+            const type = $this.data('type');
+            if (!field || !type) {
+                return;
+            }
+            if (type === 'float') {
+                value = parseFloat(value);
+                if (!Number.isFinite(value)) {
+                    $this.text(original);
+                    return;
+                }
+            } else {
+                value = parseInt(value, 10);
+                if (!Number.isFinite(value)) {
+                    $this.text(original);
+                    return;
+                }
+            }
+            const $row = $this.closest('tr');
+            const productId = safeInteger($row.data('id'));
+            updateProductField(productId, field, value, (updatedValue) => {
+                const product = products.find((item) => Number(item.id) === productId);
+                if (product) {
+                    product[field] = updatedValue;
+                    refreshTable();
+                    updateStats();
+                    showToast(t('toastUpdateSuccess', 'Valeur mise à jour.'), 'success');
+                }
+            }, () => {
+                $this.text(original);
+            });
         });
     }
 
-    $('#inventory-form').on('submit', function (event) {
+    function updateProductField(productId, field, value, onSuccess, onError) {
+        $.ajax({
+            url: ajaxUrl,
+            method: 'POST',
+            dataType: 'json',
+            data: {
+                action: 'update_product',
+                id: productId,
+                field,
+                value,
+            },
+        })
+            .done((response) => {
+                if (response && response.success) {
+                    if (typeof onSuccess === 'function') {
+                        onSuccess(value);
+                    }
+                } else {
+                    if (typeof onError === 'function') {
+                        onError();
+                    }
+                    showToast((response && response.message) || t('toastUpdateError', 'Mise à jour impossible.'), 'error');
+                }
+            })
+            .fail(() => {
+                if (typeof onError === 'function') {
+                    onError();
+                }
+                showToast(t('toastUpdateError', 'Mise à jour impossible.'), 'error');
+            });
+    }
+
+    function handleFormSubmit(event) {
         event.preventDefault();
-        const formData = new FormData(this);
+        const formData = new FormData($form[0]);
         formData.append('action', 'add_product');
+
+        $submitButton.prop('disabled', true).addClass('is-loading');
 
         $.ajax({
             url: ajaxUrl,
             method: 'POST',
             data: formData,
-            contentType: false,
             processData: false,
+            contentType: false,
             dataType: 'json',
-        }).done((response) => {
-            if (response.success) {
-                this.reset();
-                $('#image-preview').attr('src', '').addClass('is-empty');
-                showToast(response.message || 'Produit ajouté.');
-                loadProducts();
-                loadStats();
-            } else {
-                showToast(response.message || 'Erreur lors de l\'ajout.', 'error');
-            }
-        }).fail(() => {
-            showToast('Erreur lors de l\'ajout du produit.', 'error');
-        });
-    });
-
-    $('#product-image').on('change', function () {
-        const file = this.files[0];
-        if (!file) {
-            $('#image-preview').attr('src', '').addClass('is-empty');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            $('#image-preview').attr('src', e.target.result).removeClass('is-empty');
-        };
-        reader.readAsDataURL(file);
-    });
-
-    $(document).on('click', '.delete-product', function () {
-        const $row = $(this).closest('tr');
-        const id = $row.data('id');
-
-        if (!confirm('Supprimer cet article ?')) {
-            return;
-        }
-
-        $.ajax({
-            url: ajaxUrl,
-            method: 'POST',
-            data: { action: 'delete_product', id },
-            dataType: 'json',
-        }).done((response) => {
-            if (response.success) {
-                showToast(response.message || 'Article supprimé.');
-                $row.remove();
-                if ($tableBody.find('tr').length === 0) {
-                    showEmptyState();
+        })
+            .done((response) => {
+                if (response && response.success) {
+                    $form[0].reset();
+                    renderPreview(null);
+                    showToast(t('toastAddSuccess', 'Produit ajouté avec succès.'), 'success');
+                    fetchProducts();
+                } else {
+                    showToast((response && response.message) || t('toastAddError', "Erreur lors de l'ajout du produit."), 'error');
                 }
-                loadStats();
-            } else {
-                showToast(response.message || 'Suppression impossible.', 'error');
-            }
-        }).fail(() => {
-            showToast('Suppression impossible.', 'error');
-        });
-    });
+            })
+            .fail(() => {
+                showToast(t('toastAddError', "Erreur lors de l'ajout du produit."), 'error');
+            })
+            .always(() => {
+                $submitButton.prop('disabled', false).removeClass('is-loading');
+            });
+    }
 
-    $(document).on('focus', '.inventory-editable', function () {
-        $(this).data('original', $(this).text().trim());
-    });
-
-    $(document).on('keypress', '.inventory-editable', function (event) {
-        if (event.which === 13) {
-            event.preventDefault();
-            $(this).blur();
-        }
-    });
-
-    $(document).on('blur', '.inventory-editable', function () {
-        const $cell = $(this);
-        const id = $cell.closest('tr').data('id');
-        const field = $cell.data('field');
-        let value = $cell.text().trim().replace(',', '.');
-        const original = $cell.data('original');
-
-        if (field === 'stock') {
-            value = parseInt(value, 10);
-            if (Number.isNaN(value) || value < 0) {
-                $cell.text(original);
-                return;
-            }
-        } else {
-            value = parseFloat(value);
-            if (Number.isNaN(value) || value < 0) {
-                $cell.text(original);
-                return;
-            }
-            value = value.toFixed(2);
-            $cell.text(value);
-        }
-
+    function fetchProducts() {
         $.ajax({
             url: ajaxUrl,
-            method: 'POST',
-            data: { action: 'update_product', id, field, value },
+            method: 'GET',
             dataType: 'json',
-        }).done((response) => {
-            if (response.success) {
-                showToast('Valeur mise à jour.');
-                const prixAchat = parseFloat($cell.closest('tr').find('[data-field="prix_achat"]').text().replace(',', '.')) || 0;
-                const prixVente = parseFloat($cell.closest('tr').find('[data-field="prix_vente"]').text().replace(',', '.')) || 0;
-                const marge = prixVente - prixAchat;
-                $cell.closest('tr').find('.cell-marge').text(formatCurrency(marge));
-                loadStats();
-            } else {
-                $cell.text(original);
-                showToast(response.message || 'Mise à jour impossible.', 'error');
-            }
-        }).fail(() => {
-            $cell.text(original);
-            showToast('Mise à jour impossible.', 'error');
-        });
-    });
+            data: { action: 'get_products' },
+        })
+            .done((response) => {
+                if (response && response.success && Array.isArray(response.data)) {
+                    products = response.data;
+                } else if (Array.isArray(response)) {
+                    products = response;
+                } else {
+                    products = [];
+                }
+                updateCasierFilterOptions();
+                updateStatusFilterOptions();
+                refreshTable();
+                updateStats();
+            })
+            .fail(() => {
+                products = [];
+                refreshTable();
+                updateStats();
+                showToast(t('loadError', 'Impossible de charger les produits.'), 'error');
+            });
+    }
 
-    $searchInput.on('keyup', updateSearchFilter);
-
-    $('#export-csv').on('click', function () {
-        const rows = [];
-        rows.push(['Nom', 'Référence', 'Prix achat', 'Prix vente', 'Stock', 'Marge']);
-
-        $tableBody.find('tr').each(function () {
-            const $row = $(this);
-            if ($row.hasClass('empty-state') || !$row.is(':visible')) {
-                return;
-            }
-
-            const nom = $row.find('.item-name').text().trim();
-            const reference = $row.find('.item-reference').text().trim();
-            const prixAchat = $row.find('[data-field="prix_achat"]').text().trim();
-            const prixVente = $row.find('[data-field="prix_vente"]').text().trim();
-            const stock = $row.find('[data-field="stock"]').text().trim();
-            const marge = $row.find('.cell-marge').text().trim();
-
-            rows.push([nom, reference, prixAchat, prixVente, stock, marge]);
-        });
-
-        const csvContent = rows
-            .map((cols) => cols.map((value) => `"${value.replace(/"/g, '""')}"`).join(';'))
+    function exportCsv() {
+        if (!products.length) {
+            showToast(t('emptyInventory', 'Votre inventaire est vide.'), 'warning');
+            return;
+        }
+        const headers = ['ID', 'Nom', 'Référence', 'Casier', 'Prix achat', 'Prix vente', 'Stock', 'A compléter', 'Notes', 'Description', 'Date achat'];
+        const rows = products.map((product) => [
+            product.id,
+            product.nom || '',
+            product.reference || '',
+            product.emplacement || '',
+            safeNumber(product.prix_achat).toFixed(2),
+            safeNumber(product.prix_vente).toFixed(2),
+            safeInteger(product.stock),
+            Number(product.a_completer) === 1 ? '1' : '0',
+            product.notes ? product.notes.replace(/"/g, '""') : '',
+            product.description ? product.description.replace(/"/g, '""') : '',
+            product.date_achat || '',
+        ]);
+        const csv = [headers, ...rows]
+            .map((row) => row.map((value) => `"${value}"`).join(';'))
             .join('\n');
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'inventaire-bijoux.csv';
+        link.download = 'inventaire.csv';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        showToast('Export CSV généré.');
+    }
+
+    loadTheme();
+    syncQuickFilters(currentFilters.status);
+    fetchProducts();
+
+    $form.on('submit', handleFormSubmit);
+    $photoInput.on('change', (event) => {
+        const [file] = event.target.files;
+        renderPreview(file);
     });
 
-    loadProducts();
-    loadStats();
+    $themeToggle.on('click', toggleTheme);
+
+    $searchInput.on('input', () => {
+        currentFilters.search = $searchInput.val() || '';
+        refreshTable();
+    });
+
+    $filterCasier.on('change', () => {
+        currentFilters.casier = $filterCasier.val();
+        refreshTable();
+    });
+
+    $filterStatus.on('change', () => {
+        currentFilters.status = $filterStatus.val();
+        syncQuickFilters(currentFilters.status);
+        refreshTable();
+    });
+
+    $quickFilters.on('click', function () {
+        const value = $(this).data('status-filter');
+        currentFilters.status = value;
+        $filterStatus.val(value);
+        syncQuickFilters(value);
+        refreshTable();
+    });
+
+    $toggleFilters.on('click', function () {
+        const expanded = $(this).attr('aria-expanded') === 'true';
+        $(this).attr('aria-expanded', expanded ? 'false' : 'true');
+        $('#filtersPanel').toggleClass('open', !expanded);
+    });
+
+    $exportCsv.on('click', exportCsv);
+
+    $mobileAddItem.on('click', () => {
+        $formSection.get(0).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    $mobileScrollInventory.on('click', () => {
+        $inventoryCard.get(0).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    $mobileScrollStats.on('click', () => {
+        $statsCard.get(0).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    $cancelEdit.on('click', () => {
+        $form[0].reset();
+        $cancelEdit.attr('hidden', true);
+        $submitButton.text(t('submitLabel', "Ajouter à l'inventaire"));
+        renderPreview(null);
+    });
 });
