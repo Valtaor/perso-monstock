@@ -52,6 +52,12 @@ function inventory_get_table_columns(PDO $pdo): array
     }
 }
 
+// --- Enregistrement des actions AJAX WordPress ---
+add_action('wp_ajax_get_products', 'inventory_get_products_ajax');
+add_action('wp_ajax_add_product', 'inventory_add_product_ajax');
+add_action('wp_ajax_update_product', 'inventory_update_product_ajax');
+add_action('wp_ajax_delete_product', 'inventory_delete_product_ajax');
+
 /**
  * Détermine si une exception PDO provient d'une perte de connexion.
  */
