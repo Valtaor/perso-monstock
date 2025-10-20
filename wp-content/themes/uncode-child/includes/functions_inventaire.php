@@ -56,13 +56,14 @@ function inventory_ajax_precheck(): PDO
         wp_send_json_error(['message' => 'Authentification requise.'], 401);
     }
 
-    global $pdo;
+    $pdo = inventory_db_get_pdo();
+
     if (!$pdo instanceof PDO) {
-        // Tentative de reconnexion si $pdo est null
-        require_once __DIR__ . '/db_connect.php';
-        if (!$pdo instanceof PDO) {
-            wp_send_json_error(['message' => 'Connexion DB impossible.'], 500);
-        }
+        $pdo = inventory_db_get_pdo(true);
+    }
+
+    if (!$pdo instanceof PDO) {
+        wp_send_json_error(['message' => 'Connexion DB impossible.'], 500);
     }
 
     return $pdo;
