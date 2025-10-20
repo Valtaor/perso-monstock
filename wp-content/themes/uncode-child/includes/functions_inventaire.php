@@ -52,6 +52,12 @@ function inventory_get_table_columns(PDO $pdo): array
     }
 }
 
+// --- Enregistrement des actions AJAX WordPress ---
+add_action('wp_ajax_get_products', 'inventory_get_products_ajax');
+add_action('wp_ajax_add_product', 'inventory_add_product_ajax');
+add_action('wp_ajax_update_product', 'inventory_update_product_ajax');
+add_action('wp_ajax_delete_product', 'inventory_delete_product_ajax');
+
 /**
  * Détermine si une exception PDO provient d'une perte de connexion.
  */
@@ -164,6 +170,21 @@ function inventory_ajax_precheck(): PDO
                 $pdo = null;
             }
         }
+    } else {
+        $pdo = inventory_db_get_pdo(true);
+        if ($pdo instanceof PDO) {
+            inventory_reset_table_columns_cache();
+            try {
+                $pdo->query('SELECT 1');
+            } catch (PDOException $inner) {
+                error_log('Inventory - PDO connexion initiale échouée : ' . $inner->getMessage());
+                $pdo = null;
+            }
+        }
+    }
+
+    if (!$pdo instanceof PDO) {
+        wp_send_json_error(['message' => 'Connexion DB impossible.'], 500);
     }
 
     if (!$pdo instanceof PDO) {
