@@ -1,6 +1,6 @@
 jQuery(function ($) {
     const settings = window.inventorySettings || {};
-    const ajaxUrl = settings.ajaxUrl || '';
+    const ajaxUrl = settings.ajaxUrl || window.ajaxurl || '';
     const uploadsUrl = settings.uploadsUrl || '';
     const i18n = settings.i18n || {};
 

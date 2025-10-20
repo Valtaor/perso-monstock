@@ -9,6 +9,15 @@ if (!defined('ABSPATH')) {
 
 $assetVersion = '3.0.0';
 
+$uploadDir = wp_upload_dir();
+$inventoryUploadsUrl = '';
+
+if (empty($uploadDir['error'])) {
+    $inventoryUploadsUrl = trailingslashit($uploadDir['baseurl'] . '/inventory');
+} else {
+    $inventoryUploadsUrl = trailingslashit(get_stylesheet_directory_uri()) . 'uploads/';
+}
+
 wp_enqueue_style(
     'inventory-style',
     get_stylesheet_directory_uri() . '/style-inventaire.css',
@@ -28,8 +37,8 @@ wp_localize_script(
     'inventory-script',
     'inventorySettings',
     [
-        'ajaxUrl' => get_stylesheet_directory_uri() . '/includes/functions_inventaire.php',
-        'uploadsUrl' => get_stylesheet_directory_uri() . '/uploads/',
+        'ajaxUrl' => admin_url('admin-ajax.php'),
+        'uploadsUrl' => $inventoryUploadsUrl,
         'i18n' => [
             'emptyInventory' => __('Votre inventaire est vide.', 'uncode'),
             'emptySearch' => __('Aucun bijou dans l\'inventaire pour le moment.', 'uncode'),
