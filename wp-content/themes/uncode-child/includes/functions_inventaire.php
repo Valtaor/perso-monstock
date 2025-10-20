@@ -11,6 +11,17 @@ if (!defined('ABSPATH')) {
 
 require_once __DIR__ . '/db_connect.php';
 
+// Cache des colonnes pour éviter les requêtes répétées sur SHOW COLUMNS.
+$inventory_table_columns_cache = null;
+
+/**
+ * Réinitialise le cache des colonnes de la table produits.
+ */
+function inventory_reset_table_columns_cache(): void
+{
+    $GLOBALS['inventory_table_columns_cache'] = null;
+}
+
 /**
  * Retourne la liste des colonnes disponibles dans la table produits.
  *
@@ -18,27 +29,27 @@ require_once __DIR__ . '/db_connect.php';
  */
 function inventory_get_table_columns(PDO $pdo): array
 {
-    static $cache = null;
+    global $inventory_table_columns_cache;
 
-    if (is_array($cache)) {
-        return $cache;
+    if (is_array($inventory_table_columns_cache)) {
+        return $inventory_table_columns_cache;
     }
-
-    $cache = [];
 
     try {
         $stmt = $pdo->query('SHOW COLUMNS FROM produits');
+        $cache = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $column) {
             if (!empty($column['Field'])) {
                 $cache[$column['Field']] = true;
             }
         }
+        $inventory_table_columns_cache = $cache;
+        return $cache;
     } catch (PDOException $e) {
         error_log('Inventory - Impossible de récupérer les colonnes de la table produits : ' . $e->getMessage());
-        $cache = [];
+        $inventory_table_columns_cache = null;
+        return [];
     }
-
-    return $cache;
 }
 
 // --- Enregistrement des actions AJAX WordPress ---
@@ -58,8 +69,33 @@ function inventory_ajax_precheck(): PDO
 
     $pdo = inventory_db_get_pdo();
 
-    if (!$pdo instanceof PDO) {
+    if ($pdo instanceof PDO) {
+        try {
+            $pdo->query('SELECT 1');
+        } catch (PDOException $e) {
+            error_log('Inventory - PDO ping échoué : ' . $e->getMessage());
+            $pdo = inventory_db_get_pdo(true);
+            if ($pdo instanceof PDO) {
+                inventory_reset_table_columns_cache();
+                try {
+                    $pdo->query('SELECT 1');
+                } catch (PDOException $inner) {
+                    error_log('Inventory - PDO reconnect échoué : ' . $inner->getMessage());
+                    $pdo = null;
+                }
+            }
+        }
+    } else {
         $pdo = inventory_db_get_pdo(true);
+        if ($pdo instanceof PDO) {
+            inventory_reset_table_columns_cache();
+            try {
+                $pdo->query('SELECT 1');
+            } catch (PDOException $inner) {
+                error_log('Inventory - PDO connexion initiale échouée : ' . $inner->getMessage());
+                $pdo = null;
+            }
+        }
     }
 
     if (!$pdo instanceof PDO) {

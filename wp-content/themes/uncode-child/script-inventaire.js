@@ -387,11 +387,18 @@ jQuery(function ($) {
                         updateStats();
                         showToast(t('toastDeleteSuccess', 'Produit supprimé.'), 'success');
                     } else {
-                        showToast((response && response.message) || t('toastDeleteError', 'Suppression impossible.'), 'error');
+                        const errorMessage =
+                            (response && response.data && response.data.message) ||
+                            (response && response.message);
+                        showToast(errorMessage || t('toastDeleteError', 'Suppression impossible.'), 'error');
                     }
                 })
-                .fail(() => {
-                    showToast(t('toastDeleteError', 'Suppression impossible.'), 'error');
+                .fail((jqXHR) => {
+                    const response = jqXHR && jqXHR.responseJSON;
+                    const errorMessage =
+                        (response && response.data && response.data.message) ||
+                        (response && response.message);
+                    showToast(errorMessage || t('toastDeleteError', 'Suppression impossible.'), 'error');
                 });
         });
 
