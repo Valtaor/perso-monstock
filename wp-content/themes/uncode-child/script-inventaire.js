@@ -459,17 +459,24 @@ jQuery(function ($) {
                         onSuccess(value);
                     }
                 } else {
+                    const errorMessage =
+                        (response && response.data && response.data.message) ||
+                        (response && response.message);
                     if (typeof onError === 'function') {
                         onError();
                     }
-                    showToast((response && response.message) || t('toastUpdateError', 'Mise à jour impossible.'), 'error');
+                    showToast(errorMessage || t('toastUpdateError', 'Mise à jour impossible.'), 'error');
                 }
             })
-            .fail(() => {
+            .fail((jqXHR) => {
+                const response = jqXHR && jqXHR.responseJSON;
+                const errorMessage =
+                    (response && response.data && response.data.message) ||
+                    (response && response.message);
                 if (typeof onError === 'function') {
                     onError();
                 }
-                showToast(t('toastUpdateError', 'Mise à jour impossible.'), 'error');
+                showToast(errorMessage || t('toastUpdateError', 'Mise à jour impossible.'), 'error');
             });
     }
 
@@ -495,11 +502,18 @@ jQuery(function ($) {
                     showToast(t('toastAddSuccess', 'Produit ajouté avec succès.'), 'success');
                     fetchProducts();
                 } else {
-                    showToast((response && response.message) || t('toastAddError', "Erreur lors de l'ajout du produit."), 'error');
+                    const errorMessage =
+                        (response && response.data && response.data.message) ||
+                        (response && response.message);
+                    showToast(errorMessage || t('toastAddError', "Erreur lors de l'ajout du produit."), 'error');
                 }
             })
-            .fail(() => {
-                showToast(t('toastAddError', "Erreur lors de l'ajout du produit."), 'error');
+            .fail((jqXHR) => {
+                const response = jqXHR && jqXHR.responseJSON;
+                const errorMessage =
+                    (response && response.data && response.data.message) ||
+                    (response && response.message);
+                showToast(errorMessage || t('toastAddError', "Erreur lors de l'ajout du produit."), 'error');
             })
             .always(() => {
                 $submitButton.prop('disabled', false).removeClass('is-loading');

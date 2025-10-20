@@ -57,7 +57,7 @@ body.inventory-dark {
         var(--background);
     color: var(--text-primary);
     min-height: 100vh;
-    padding: clamp(40px, 10vw, 80px) clamp(16px, 6vw, 48px) 120px;
+    padding: clamp(36px, 8vw, 72px) clamp(12px, 4vw, 36px) 120px;
     box-sizing: border-box;
 }
 
@@ -66,11 +66,12 @@ body.inventory-dark .inventory-page.dashboard-v9 {
 }
 
 .inventory-dashboard {
-    max-width: 1260px;
+    max-width: 1440px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
     gap: clamp(32px, 6vw, 48px);
+    width: 100%;
 }
 
 .inventory-hero {
@@ -154,8 +155,8 @@ body.inventory-dark .inventory-hero::before {
 
 .inventory-container {
     display: grid;
-    grid-template-columns: minmax(0, 520px) minmax(0, 1fr);
-    gap: clamp(28px, 5vw, 40px);
+    grid-template-columns: minmax(0, 640px) minmax(0, 1fr);
+    gap: clamp(28px, 4vw, 40px);
     align-items: start;
 }
 
@@ -190,7 +191,7 @@ body.inventory-dark .inventory-hero::before {
 
 .form-grid {
     display: grid;
-    grid-template-columns: minmax(0, 210px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
     gap: 24px;
 }
 
@@ -454,7 +455,8 @@ button,
 button.primary,
 .primary {
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: #120a0d;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
     box-shadow: 0 26px 46px -24px rgba(196, 123, 131, 0.65);
 }
 

@@ -111,16 +111,15 @@ function inventory_handle_wp_upload(): ?string
 
     $file = $_FILES['image'];
 
+    if (!function_exists('wp_handle_upload') || !function_exists('wp_check_filetype_and_ext')) {
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+    }
+
     // Vérification type MIME avec WordPress
     $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     $file_info = wp_check_filetype_and_ext($file['tmp_name'], $file['name']);
     if (empty($file_info['ext']) || empty($file_info['type']) || !in_array($file_info['type'], $allowed_types, true)) {
         throw new Exception('Type de fichier non autorisé. Images acceptées : JPG, PNG, GIF, WebP.');
-    }
-
-    // Utiliser wp_handle_upload
-    if (!function_exists('wp_handle_upload')) {
-        require_once ABSPATH . 'wp-admin/includes/file.php';
     }
 
     // Définir le répertoire cible dans 'uploads/inventory'
@@ -146,6 +145,9 @@ function inventory_set_upload_dir(array $dirs): array
     $dirs['subdir'] = $subdir;
     $dirs['path'] = $dirs['basedir'] . $subdir;
     $dirs['url'] = $dirs['baseurl'] . $subdir;
+    if (!empty($dirs['path']) && function_exists('wp_mkdir_p')) {
+        wp_mkdir_p($dirs['path']);
+    }
     return $dirs;
 }
 
