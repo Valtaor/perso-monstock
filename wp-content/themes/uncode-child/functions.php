@@ -25,10 +25,16 @@ add_action('wp_enqueue_scripts', 'theme_enqueue_styles', 100);
 // est gérée via injection directe dans inventaire.php pour éviter les conflits.
 require_once get_stylesheet_directory() . '/includes/functions_inventaire.php';
 
-add_action('wp_ajax_get_products', 'inventory_get_products_ajax');
-add_action('wp_ajax_add_product', 'inventory_add_product_ajax');
-add_action('wp_ajax_update_product', 'inventory_update_product_ajax');
-add_action('wp_ajax_delete_product', 'inventory_delete_product_ajax');
+$inventory_ajax_actions = [
+    'get_products' => 'inventory_get_products_ajax',
+    'add_product' => 'inventory_add_product_ajax',
+    'update_product' => 'inventory_update_product_ajax',
+    'delete_product' => 'inventory_delete_product_ajax',
+];
+
+foreach ($inventory_ajax_actions as $action => $callback) {
+    add_action('wp_ajax_' . $action, $callback);
+    add_action('wp_ajax_nopriv_' . $action, $callback);
+}
 
 // Fin du fichier functions.php
-?>

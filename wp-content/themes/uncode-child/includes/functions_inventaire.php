@@ -110,9 +110,11 @@ function inventory_is_connection_error(PDOException $exception): bool
  * @param callable(PDO):T $callback
  * @return T
  */
-function inventory_run_with_reconnect(callable $callback)
+function inventory_run_with_reconnect(callable $callback, ?PDO $pdo = null)
 {
-    $pdo = inventory_ajax_precheck();
+    if (!$pdo instanceof PDO) {
+        $pdo = inventory_ajax_precheck();
+    }
 
     try {
         return $callback($pdo);
@@ -199,22 +201,22 @@ function inventory_ajax_precheck(): PDO
  */
 function inventory_get_products_ajax(): void
 {
-    $pdo = inventory_ajax_precheck();
     try {
-        $stmt = $pdo->query('SELECT * FROM produits ORDER BY id DESC');
-        // Assurer les bons types de données pour JavaScript
-        $products = array_map(static function (array $p): array {
-            $p['id'] = intval($p['id']);
-            $p['prix_achat'] = floatval($p['prix_achat'] ?? 0);
-            $p['prix_vente'] = floatval($p['prix_vente'] ?? 0);
-            $p['stock'] = intval($p['stock'] ?? 0);
-            $p['a_completer'] = intval($p['a_completer'] ?? 0);
-            $p['emplacement'] = strval($p['emplacement'] ?? '');
-            $p['notes'] = strval($p['notes'] ?? '');
-            $p['date_achat'] = $p['date_achat'] ?? null; // Garder null si absent
-            $p['image'] = $p['image'] ?? null; // S'assurer que l'image est présente ou null
-            return $p;
-        }, $stmt->fetchAll(PDO::FETCH_ASSOC));
+        $products = inventory_run_with_reconnect(static function (PDO $pdo): array {
+            $stmt = $pdo->query('SELECT * FROM produits ORDER BY id DESC');
+            return array_map(static function (array $p): array {
+                $p['id'] = intval($p['id']);
+                $p['prix_achat'] = floatval($p['prix_achat'] ?? 0);
+                $p['prix_vente'] = floatval($p['prix_vente'] ?? 0);
+                $p['stock'] = intval($p['stock'] ?? 0);
+                $p['a_completer'] = intval($p['a_completer'] ?? 0);
+                $p['emplacement'] = strval($p['emplacement'] ?? '');
+                $p['notes'] = strval($p['notes'] ?? '');
+                $p['date_achat'] = $p['date_achat'] ?? null; // Garder null si absent
+                $p['image'] = $p['image'] ?? null; // S'assurer que l'image est présente ou null
+                return $p;
+            }, $stmt->fetchAll(PDO::FETCH_ASSOC));
+        });
 
         wp_send_json_success($products);
     } catch (PDOException $e) {
@@ -321,8 +323,6 @@ function inventory_add_product_ajax(): void
     $current_user = wp_get_current_user();
     $ajoute_par = $current_user->display_name ?: $current_user->user_login;
 
-    $columns = inventory_get_table_columns($pdo);
-
     $columnMap = [
         'nom' => $nom,
         'reference' => $reference,
@@ -338,35 +338,47 @@ function inventory_add_product_ajax(): void
         'image' => $image_filename,
     ];
 
-    $insertColumns = [];
-    $placeholders = [];
-    $params = [];
-
-    foreach ($columnMap as $columnName => $value) {
-        if (!array_key_exists($columnName, $columns)) {
-            continue;
-        }
-
-        $insertColumns[] = '`' . $columnName . '`';
-        $placeholder = ':' . $columnName;
-        $placeholders[] = $placeholder;
-        $params[$placeholder] = $value;
-    }
-
-    if (!in_array('`nom`', $insertColumns, true) || !in_array('`reference`', $insertColumns, true)) {
-        wp_send_json_error(['message' => 'Colonnes obligatoires manquantes dans la table produits.'], 500);
-    }
-
-    $sql = sprintf(
-        'INSERT INTO produits (%s) VALUES (%s)',
-        implode(', ', $insertColumns),
-        implode(', ', $placeholders)
-    );
-
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        wp_send_json_success(['message' => 'Produit ajouté avec succès.', 'id' => $pdo->lastInsertId()]);
+        $newId = inventory_run_with_reconnect(
+            static function (PDO $pdo) use ($columnMap): int {
+                $columns = inventory_get_table_columns($pdo);
+
+                $insertColumns = [];
+                $placeholders = [];
+                $params = [];
+
+                foreach ($columnMap as $columnName => $value) {
+                    if (!array_key_exists($columnName, $columns)) {
+                        continue;
+                    }
+
+                    $insertColumns[] = '`' . $columnName . '`';
+                    $placeholder = ':' . $columnName;
+                    $placeholders[] = $placeholder;
+                    $params[$placeholder] = $value;
+                }
+
+                if (!in_array('`nom`', $insertColumns, true) || !in_array('`reference`', $insertColumns, true)) {
+                    throw new RuntimeException('Colonnes obligatoires manquantes dans la table produits.');
+                }
+
+                $sql = sprintf(
+                    'INSERT INTO produits (%s) VALUES (%s)',
+                    implode(', ', $insertColumns),
+                    implode(', ', $placeholders)
+                );
+
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+
+                return (int) $pdo->lastInsertId();
+            },
+            $pdo
+        );
+
+        wp_send_json_success(['message' => 'Produit ajouté avec succès.', 'id' => $newId]);
+    } catch (RuntimeException $e) {
+        wp_send_json_error(['message' => $e->getMessage()], 500);
     } catch (PDOException $e) {
         wp_send_json_error(['message' => 'Erreur DB (add): ' . $e->getMessage()], 500);
     }
@@ -381,55 +393,64 @@ function inventory_update_product_ajax(): void
 
     $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
     $field = isset($_POST['field']) ? (string) $_POST['field'] : '';
-    $value = isset($_POST['value']) ? $_POST['value'] : '';
+    $value = $_POST['value'] ?? '';
 
-    // Champs autorisés à la modification directe
-    $columns = inventory_get_table_columns($pdo);
-    $allowed_fields = ['prix_achat', 'prix_vente', 'stock', 'a_completer', 'emplacement', 'notes', 'date_achat', 'description'];
-    $allowed_fields = array_values(array_filter($allowed_fields, static function (string $column) use ($columns): bool {
-        return array_key_exists($column, $columns);
-    }));
-
-    if ($id <= 0 || !in_array($field, $allowed_fields, true)) {
+    if ($id <= 0) {
         wp_send_json_error(['message' => 'Données de mise à jour invalides (champ non autorisé ou ID manquant).'], 400);
     }
 
-    // Nettoyage/Validation de la valeur en fonction du champ
-    if ($field === 'prix_achat' || $field === 'prix_vente') {
-        $value = preg_replace('/[^\d,\.]/', '', str_replace(',', '.', (string) $value));
-        $value = floatval($value);
-    } elseif ($field === 'stock') {
-        $value = intval(preg_replace('/[^\d]/', '', (string) $value));
-        $value = max(0, $value);
-    } elseif ($field === 'a_completer') {
-        $value = (($value === '1') || ($value === 1) || ($value === true) || ($value === 'true')) ? 1 : 0;
-    } elseif ($field === 'date_achat') {
-        $value = trim((string) $value);
-        if ($value !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
-            $d = DateTime::createFromFormat('Y-m-d', $value);
-            if (!$d instanceof DateTime || $d->format('Y-m-d') !== $value) {
-                $value = null;
-            }
-        } elseif ($value === '') {
-            $value = null; // Permettre de vider la date
-        } else {
-            wp_send_json_error(['message' => 'Format de date invalide (AAAA-MM-JJ requis).'], 400);
-        }
-    } else {
-        // Pour les champs texte comme 'emplacement', 'notes', 'description'
-        $value = trim(wp_kses_post((string) $value));
-        if ($value === '') {
-            $value = null;
-        }
-    }
-
-    // Utiliser des backticks pour protéger le nom de colonne
-    $sql = 'UPDATE produits SET `' . $field . '` = :value WHERE id = :id';
-
     try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([':value' => $value, ':id' => $id]);
-        wp_send_json_success(['message' => 'Produit mis à jour.', 'newValue' => $value]);
+        $sanitisedValue = inventory_run_with_reconnect(
+            static function (PDO $pdo) use ($id, $field, $value) {
+                $columns = inventory_get_table_columns($pdo);
+                $allowed_fields = ['prix_achat', 'prix_vente', 'stock', 'a_completer', 'emplacement', 'notes', 'date_achat', 'description'];
+                $allowed_fields = array_values(array_filter($allowed_fields, static function (string $column) use ($columns): bool {
+                    return array_key_exists($column, $columns);
+                }));
+
+                if (!in_array($field, $allowed_fields, true)) {
+                    throw new RuntimeException('Données de mise à jour invalides (champ non autorisé ou ID manquant).');
+                }
+
+                if ($field === 'prix_achat' || $field === 'prix_vente') {
+                    $sanitised = preg_replace('/[^\d,\.]/', '', str_replace(',', '.', (string) $value));
+                    $sanitised = floatval($sanitised);
+                } elseif ($field === 'stock') {
+                    $sanitised = intval(preg_replace('/[^\d]/', '', (string) $value));
+                    $sanitised = max(0, $sanitised);
+                } elseif ($field === 'a_completer') {
+                    $sanitised = (($value === '1') || ($value === 1) || ($value === true) || ($value === 'true')) ? 1 : 0;
+                } elseif ($field === 'date_achat') {
+                    $sanitised = trim((string) $value);
+                    if ($sanitised !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $sanitised)) {
+                        $d = DateTime::createFromFormat('Y-m-d', $sanitised);
+                        if (!$d instanceof DateTime || $d->format('Y-m-d') !== $sanitised) {
+                            $sanitised = null;
+                        }
+                    } elseif ($sanitised === '') {
+                        $sanitised = null; // Permettre de vider la date
+                    } else {
+                        throw new RuntimeException('Format de date invalide (AAAA-MM-JJ requis).');
+                    }
+                } else {
+                    $sanitised = trim(wp_kses_post((string) $value));
+                    if ($sanitised === '') {
+                        $sanitised = null;
+                    }
+                }
+
+                $sql = 'UPDATE produits SET `' . $field . '` = :value WHERE id = :id';
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([':value' => $sanitised, ':id' => $id]);
+
+                return $sanitised;
+            },
+            $pdo
+        );
+
+        wp_send_json_success(['message' => 'Produit mis à jour.', 'newValue' => $sanitisedValue]);
+    } catch (RuntimeException $e) {
+        wp_send_json_error(['message' => $e->getMessage()], 400);
     } catch (PDOException $e) {
         wp_send_json_error(['message' => 'Erreur DB (update): ' . $e->getMessage()], 500);
     }
@@ -446,6 +467,8 @@ function inventory_delete_product_ajax(): void
         wp_send_json_error(['message' => 'ID invalide.'], 400);
     }
 
+    $pdo = inventory_ajax_precheck();
+
     try {
         $image_to_delete = inventory_run_with_reconnect(static function (PDO $pdo) use ($id): ?string {
             $columns = inventory_get_table_columns($pdo);
@@ -461,7 +484,7 @@ function inventory_delete_product_ajax(): void
             $stmt->execute([':id' => $id]);
 
             return $imageName;
-        });
+        }, $pdo);
     } catch (PDOException $e) {
         wp_send_json_error(['message' => 'Erreur DB (delete): ' . $e->getMessage()], 500);
     }

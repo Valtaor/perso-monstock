@@ -77,6 +77,49 @@ jQuery(function ($) {
         return $('<div>').text(value == null ? '' : String(value)).html();
     }
 
+    function extractAjaxError(jqXHR) {
+        if (jqXHR && jqXHR.responseJSON) {
+            const response = jqXHR.responseJSON;
+            if (response.data && response.data.message) {
+                return response.data.message;
+            }
+            if (response.message) {
+                return response.message;
+            }
+        }
+
+        if (jqXHR && typeof jqXHR.responseText === 'string') {
+            let text = jqXHR.responseText.trim();
+            if (!text) {
+                return '';
+            }
+
+            const commentIndex = text.indexOf('//');
+            if (commentIndex !== -1 && commentIndex > text.lastIndexOf('}')) {
+                text = text.slice(0, commentIndex).trim();
+            }
+
+            if (text.startsWith('{')) {
+                try {
+                    const parsed = JSON.parse(text);
+                    if (parsed && parsed.data && parsed.data.message) {
+                        return parsed.data.message;
+                    }
+                    if (parsed && parsed.message) {
+                        return parsed.message;
+                    }
+                } catch (error) {
+                    // Ignore JSON parsing errors and fall back to cleaned text
+                }
+            }
+
+            const cleaned = text.replace(/<[^>]*>/g, '').trim();
+            return cleaned;
+        }
+
+        return '';
+    }
+
     function showToast(message, type = 'success') {
         if (!message) {
             return;
@@ -393,12 +436,10 @@ jQuery(function ($) {
                         showToast(errorMessage || t('toastDeleteError', 'Suppression impossible.'), 'error');
                     }
                 })
-                .fail((jqXHR) => {
-                    const response = jqXHR && jqXHR.responseJSON;
-                    const errorMessage =
-                        (response && response.data && response.data.message) ||
-                        (response && response.message);
-                    showToast(errorMessage || t('toastDeleteError', 'Suppression impossible.'), 'error');
+                .fail((jqXHR, textStatus) => {
+                    const errorMessage = extractAjaxError(jqXHR) || t('toastDeleteError', 'Suppression impossible.');
+                    console.error('AJAX Error (delete_product):', textStatus, jqXHR);
+                    showToast(errorMessage, 'error');
                 });
         });
 
@@ -475,15 +516,13 @@ jQuery(function ($) {
                     showToast(errorMessage || t('toastUpdateError', 'Mise à jour impossible.'), 'error');
                 }
             })
-            .fail((jqXHR) => {
-                const response = jqXHR && jqXHR.responseJSON;
-                const errorMessage =
-                    (response && response.data && response.data.message) ||
-                    (response && response.message);
+            .fail((jqXHR, textStatus) => {
+                const errorMessage = extractAjaxError(jqXHR) || t('toastUpdateError', 'Mise à jour impossible.');
+                console.error('AJAX Error (update_product):', textStatus, jqXHR);
                 if (typeof onError === 'function') {
                     onError();
                 }
-                showToast(errorMessage || t('toastUpdateError', 'Mise à jour impossible.'), 'error');
+                showToast(errorMessage, 'error');
             });
     }
 
@@ -515,12 +554,10 @@ jQuery(function ($) {
                     showToast(errorMessage || t('toastAddError', "Erreur lors de l'ajout du produit."), 'error');
                 }
             })
-            .fail((jqXHR) => {
-                const response = jqXHR && jqXHR.responseJSON;
-                const errorMessage =
-                    (response && response.data && response.data.message) ||
-                    (response && response.message);
-                showToast(errorMessage || t('toastAddError', "Erreur lors de l'ajout du produit."), 'error');
+            .fail((jqXHR, textStatus) => {
+                const errorMessage = extractAjaxError(jqXHR) || t('toastAddError', "Erreur lors de l'ajout du produit.");
+                console.error('AJAX Error (add_product):', textStatus, jqXHR);
+                showToast(errorMessage, 'error');
             })
             .always(() => {
                 $submitButton.prop('disabled', false).removeClass('is-loading');
@@ -547,11 +584,13 @@ jQuery(function ($) {
                 refreshTable();
                 updateStats();
             })
-            .fail(() => {
+            .fail((jqXHR, textStatus) => {
                 products = [];
                 refreshTable();
                 updateStats();
-                showToast(t('loadError', 'Impossible de charger les produits.'), 'error');
+                const errorMessage = extractAjaxError(jqXHR) || t('loadError', 'Impossible de charger les produits.');
+                console.error('AJAX Error (get_products):', textStatus, jqXHR);
+                showToast(errorMessage, 'error');
             });
     }
 
