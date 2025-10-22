@@ -51,6 +51,8 @@ function inventory_get_table_columns(PDO $pdo): array
         return [];
     }
 }
+add_action('wp_ajax_get_products', 'inventory_get_products');
+add_action('wp_ajax_nopriv_get_products', 'inventory_get_products');
 
 /**
  * Détermine si une exception PDO provient d'une perte de connexion.
@@ -174,6 +176,8 @@ function inventory_ajax_precheck(): PDO
 
     return $pdo;
 }
+add_action('wp_ajax_add_product', 'inventory_add_product');
+add_action('wp_ajax_nopriv_add_product', 'inventory_add_product');
 
 /**
  * Récupère tous les produits pour affichage
@@ -242,6 +246,7 @@ function inventory_handle_wp_upload(): ?string
     // Retourner seulement le nom du fichier (il sera dans uploads/inventory/)
     return basename($movefile['file']);
 }
+add_action('wp_ajax_update_product', 'inventory_update_product');
 
 /**
  * Modifie temporairement le répertoire d'upload pour WordPress
@@ -257,6 +262,7 @@ function inventory_set_upload_dir(array $dirs): array
     }
     return $dirs;
 }
+add_action('wp_ajax_delete_product', 'inventory_delete_product');
 
 /**
  * Ajoute un produit (avec tous les champs de la DB)
@@ -484,3 +490,4 @@ function inventory_delete_product_ajax(): void
 
     wp_send_json_success(['message' => 'Produit supprimé.']);
 }
+register_activation_hook(__FILE__, 'inventory_activate');
