@@ -191,6 +191,39 @@ jQuery(function ($) {
         return `${value.slice(0, maxLength - 1)}…`;
     }
 
+    function resolveImageUrl(imageValue) {
+        if (!imageValue) {
+            return '';
+        }
+
+        const raw = String(imageValue).trim();
+        if (!raw) {
+            return '';
+        }
+
+        if (/^https?:\/\//i.test(raw) || raw.startsWith('//')) {
+            return raw;
+        }
+
+        if (raw.startsWith('/')) {
+            return raw;
+        }
+
+        const base = uploadsUrl || '';
+        if (!base) {
+            return raw;
+        }
+
+        let normalizedBase = base.endsWith('/') ? base : `${base}/`;
+        const cleaned = raw.replace(/^\.?\//, '');
+
+        if (/^inventory\//i.test(cleaned)) {
+            return normalizedBase + cleaned.replace(/^inventory\//i, '');
+        }
+
+        return normalizedBase + cleaned;
+    }
+
     function buildRow(product) {
         const stock = safeInteger(product.stock);
         const prixAchat = safeNumber(product.prix_achat);
@@ -199,8 +232,9 @@ jQuery(function ($) {
         const status = buildStatus(product);
         const isIncomplete = Number(product.a_completer) === 1;
         const safeName = escapeHtml(product.nom || '');
-        const imageCell = product.image
-            ? `<img src="${uploadsUrl}${product.image}" alt="${safeName}" class="inventory-thumb">`
+        const imageUrl = resolveImageUrl(product.image);
+        const imageCell = imageUrl
+            ? `<img src="${imageUrl}" alt="${safeName}" class="inventory-thumb">`
             : '<div class="inventory-thumb placeholder" aria-hidden="true">💎</div>';
 
         const notes = escapeHtml(product.notes);
